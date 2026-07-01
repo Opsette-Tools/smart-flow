@@ -1,0 +1,85 @@
+/**
+ * Global design tokens for SmartFlow.
+ *
+ * One place to tune sizing for the whole app. Components reference these
+ * variables instead of hardcoding pixels inline, so the page scales as one
+ * coherent system rather than a grab-bag of magic numbers.
+ *
+ * Sizes use clamp(MIN, PREFERRED, MAX) so they grow smoothly between phone
+ * and desktop — no janky jumps at a breakpoint. The middle vw-based term is
+ * what does the fluid scaling; the outer two clamp it so it never gets
+ * comically small on a watch or huge on a 4K monitor.
+ */
+:root {
+  /* ---- Page container ---------------------------------------------------- */
+  --ops-page-max: 1280px;
+  /* Horizontal page gutter: 20px on a phone → 28px on desktop. */
+  --ops-page-pad: clamp(20px, 5vw, 28px);
+
+  /* ---- Spacing scale ----------------------------------------------------- */
+  /* A small, consistent ramp. Fixed (not fluid) so rhythm stays predictable;
+     the page gutter above is the one piece that needs to breathe. */
+  --ops-space-xs: 4px;
+  --ops-space-sm: 8px;
+  --ops-space-md: 12px;
+  --ops-space-lg: 16px;
+  --ops-space-xl: 24px;
+
+  /* Vertical block gap inside the grid (gutter between cards). */
+  --ops-grid-gap: clamp(16px, 3vw, 24px);
+
+  /* ---- Fluid type scale -------------------------------------------------- */
+  /* Tuned to read BIG on a phone (the high end of each clamp is reached at
+     small widths via the vw term) and settle to comfortable desktop sizes. */
+  --ops-fs-fine: clamp(12px, 3vw, 13px);      /* fine print / hints */
+  --ops-fs-caption: clamp(13px, 3.4vw, 14px); /* secondary labels */
+  --ops-fs-body: clamp(15px, 4vw, 16px);      /* body, item cards */
+  --ops-fs-label: clamp(15px, 4vw, 16px);     /* form field labels */
+  --ops-fs-sub: clamp(16px, 4.4vw, 18px);     /* intro copy / section sub */
+  --ops-fs-lane: clamp(15px, 4vw, 16px);      /* lane header label */
+
+  /* ---- Brand palette (single source so components never re-derive) ------- */
+  --ops-green: #2f4f46;
+  --ops-green-light: #426f62;
+  --ops-gold: #cfae60;
+
+  /* ---- Radius ------------------------------------------------------------ */
+  --ops-radius: 8px;
+
+  /* ---- Card interior padding (breathing room inside cards) --------------- */
+  --ops-card-pad: clamp(16px, 5vw, 24px);
+}
+
+/**
+ * Mobile control polish — the parts that legitimately belong in CSS.
+ *
+ * IMPORTANT: control HEIGHT is NOT set here. Forcing height on AntD controls
+ * with CSS breaks their internal box model. Height is set the correct way —
+ * through AntD's `controlHeight` theme token in theme.tsx — so each control
+ * computes its own internal layout at the larger size. CSS only handles what
+ * theme tokens can't.
+ */
+@media (max-width: 767px) {
+  /* iOS Safari auto-zooms the page when a focused input's font-size is below
+     16px — the classic "page jumps when I tap a field" bug. 16px kills it. */
+  .ant-input,
+  .ant-input-affix-wrapper input,
+  .ant-select-selection-search-input,
+  .ant-select-selection-item {
+    font-size: 16px !important;
+  }
+
+  /* Visible press feedback — the control dips the instant you touch it, so a
+     tap is unmistakably registered even on iOS where there's no vibration. */
+  .ant-btn:active,
+  .ant-select-selector:active,
+  .ant-input:active {
+    transform: scale(0.985);
+    transition: transform 60ms ease;
+  }
+
+  /* Give cards real breathing room inside on phones. */
+  .ant-card-body {
+    padding: var(--ops-card-pad);
+  }
+}

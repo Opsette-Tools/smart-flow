@@ -1,0 +1,419 @@
+/* ==========================================================================
+   SmartFlow — app layout & build-mode styling.
+   Tokens come from styles/tokens.css; this file is SmartFlow-specific layout.
+   Dark mode keys off html.dark (set by theme.tsx).
+   ========================================================================== */
+
+.sf-main {
+  /* Near-edge-to-edge: the build board (lanes) wants room, so we let the page
+     run wide and keep only a small gutter, rather than capping at a narrow
+     centered column. A high cap still protects ultra-wide monitors. */
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: var(--ops-space-lg) clamp(12px, 2vw, 24px) calc(var(--ops-space-xl) * 2);
+}
+
+/* Mode toggle row */
+.sf-modebar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--ops-space-xl);
+}
+
+/* Top bar: which diagram + switch control */
+.sf-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+  margin-bottom: var(--ops-space-xl);
+  flex-wrap: wrap;
+}
+.sf-topbar-which {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sf-topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-sm);
+  flex-wrap: wrap;
+}
+
+/* Chooser modal options */
+.sf-chooser-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.sf-chooser-option:hover {
+  border-color: var(--ops-green-light);
+}
+.sf-chooser-option.is-selected {
+  border-color: var(--ops-green);
+  background: rgba(47, 79, 70, 0.05);
+}
+html.dark .sf-chooser-option {
+  --sf-border: #303030;
+}
+html.dark .sf-chooser-option.is-selected {
+  background: rgba(207, 174, 96, 0.1);
+  border-color: var(--ops-gold);
+}
+
+/* Section intro line shown above a panel */
+.sf-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+  margin-bottom: var(--ops-space-md);
+  flex-wrap: wrap;
+}
+.sf-section-title {
+  font-size: var(--ops-fs-sub);
+  font-weight: 600;
+  margin: 0;
+}
+.sf-section-hint {
+  font-size: var(--ops-fs-fine);
+  color: #888;
+}
+html.dark .sf-section-hint {
+  color: #8a8a8a;
+}
+
+/* Stacked panels in build mode */
+.sf-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-grid-gap);
+}
+
+/* ---- Lane manager (chips) ------------------------------------------------ */
+.sf-lane-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ops-space-sm);
+  align-items: center;
+}
+.sf-lane-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ops-space-xs);
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--sf-border, #e5e7eb);
+  border-radius: 999px;
+  background: var(--sf-chip-bg, #fff);
+  font-size: var(--ops-fs-caption);
+  cursor: grab;
+  user-select: none;
+}
+.sf-lane-chip:active {
+  cursor: grabbing;
+}
+.sf-lane-chip.is-dragging {
+  opacity: 0.5;
+}
+html.dark .sf-lane-chip {
+  --sf-border: #333;
+  --sf-chip-bg: #1f1f1f;
+}
+.sf-lane-chip-grip {
+  color: #b8b8b8;
+  display: inline-flex;
+}
+.sf-lane-chip-order {
+  color: var(--ops-green);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+html.dark .sf-lane-chip-order {
+  color: var(--ops-gold);
+}
+
+/* ---- Inbox items --------------------------------------------------------- */
+.sf-inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-sm);
+}
+.sf-inbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-sm);
+  padding: var(--ops-space-sm);
+  border: 1px solid var(--sf-border, #e5e7eb);
+  border-radius: var(--ops-radius);
+  background: var(--sf-row-bg, #fff);
+}
+html.dark .sf-inbox-row {
+  --sf-border: #303030;
+  --sf-row-bg: #161616;
+}
+.sf-inbox-row.is-dragging {
+  opacity: 0.5;
+}
+.sf-inbox-label {
+  flex: 1 1 auto;
+  font-size: var(--ops-fs-body);
+  min-width: 0;
+}
+.sf-inbox-assign {
+  flex: 0 0 auto;
+  width: 168px;
+  max-width: 44vw;
+}
+
+/* ---- Lane columns -------------------------------------------------------- */
+.sf-lanes-scroll {
+  /* No horizontal scroll: lanes wrap onto the next row instead. The page
+     scrolls vertically as normal — no floating mid-page scrollbar. */
+  padding-bottom: var(--ops-space-sm);
+}
+.sf-lanes-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ops-grid-gap);
+  align-items: stretch;
+}
+.sf-lane-col {
+  /* Grow to share the row, but ~280px basis so about six fit per row at a
+     typical desktop width; extra lanes wrap to the next row. */
+  flex: 1 1 280px;
+  max-width: 420px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  background: var(--sf-col-bg, #fcfcfc);
+  overflow: hidden;
+}
+html.dark .sf-lane-col {
+  --sf-border: #2a2a2a;
+  --sf-col-bg: #141414;
+}
+.sf-lane-col.is-over {
+  border-color: var(--ops-green-light);
+  box-shadow: 0 0 0 2px rgba(66, 111, 98, 0.25);
+}
+.sf-lane-col-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-sm);
+  padding: 10px var(--ops-space-md);
+  background: var(--ops-green);
+  color: #fff;
+}
+.sf-lane-col-name {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: var(--ops-fs-lane);
+  border: none;
+  background: transparent;
+  color: #fff;
+  min-width: 0;
+}
+.sf-lane-col-name::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+.sf-lane-col-count {
+  font-size: var(--ops-fs-fine);
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+.sf-lane-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-sm);
+  padding: var(--ops-space-md);
+  min-height: 72px;
+}
+.sf-lane-empty {
+  font-size: var(--ops-fs-fine);
+  color: #aaa;
+  text-align: center;
+  padding: var(--ops-space-md) 0;
+  border: 1px dashed var(--sf-border, #ddd);
+  border-radius: var(--ops-radius);
+}
+html.dark .sf-lane-empty {
+  color: #777;
+}
+.sf-lane-col-foot {
+  padding: 0 var(--ops-space-md) var(--ops-space-md);
+}
+
+/* ---- Lane item card ------------------------------------------------------ */
+.sf-card {
+  border: 1px solid var(--sf-border, #e5e7eb);
+  border-radius: var(--ops-radius);
+  background: var(--sf-card-bg, #fff);
+  padding: var(--ops-space-sm) var(--ops-space-sm) var(--ops-space-sm) 0;
+}
+html.dark .sf-card {
+  --sf-border: #303030;
+  --sf-card-bg: #1d1d1d;
+}
+.sf-card.is-dragging {
+  opacity: 0.5;
+}
+.sf-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-xs);
+}
+.sf-card-grip {
+  flex: 0 0 auto;
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #c0c0c0;
+  cursor: grab;
+  align-self: stretch;
+}
+.sf-card-grip:active {
+  cursor: grabbing;
+}
+.sf-card-label {
+  flex: 1 1 auto;
+  font-size: var(--ops-fs-body);
+  min-width: 0;
+}
+.sf-card-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+.sf-card-connect {
+  padding: var(--ops-space-xs) 0 0 28px;
+}
+
+/* ---- Connection summary chips on a card --------------------------------- */
+.sf-conn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 0 28px;
+}
+.sf-conn-arrow {
+  color: var(--ops-green-light);
+  font-size: var(--ops-fs-fine);
+}
+html.dark .sf-conn-arrow {
+  color: var(--ops-gold);
+}
+
+/* ---- Diagram mode -------------------------------------------------------- */
+.sf-diagram-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+  margin-bottom: var(--ops-space-md);
+  flex-wrap: wrap;
+}
+.sf-diagram-frame {
+  position: relative;
+  height: clamp(420px, 70vh, 760px);
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  overflow: hidden;
+  background: var(--sf-canvas, #fafafa);
+}
+html.dark .sf-diagram-frame {
+  --sf-border: #2a2a2a;
+  --sf-canvas: #0e0e0e;
+}
+
+/* React Flow custom nodes */
+.sf-rf-lane {
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(47, 79, 70, 0.18);
+  background: rgba(47, 79, 70, 0.04);
+}
+.sf-rf-lane-head {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--ops-green);
+  border-radius: 10px 10px 0 0;
+  letter-spacing: 0.01em;
+}
+.sf-rf-item {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #d8dddb;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Decision step — gold-tinted, rounded, reads as a fork point. */
+.sf-rf-decision {
+  border-color: #cfae60;
+  background: rgba(207, 174, 96, 0.12);
+  justify-content: center;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Timeline milestone — taller card with a top accent bar. */
+.sf-rf-milestone {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  border-top: 3px solid var(--ops-green);
+  padding: 0 14px;
+}
+
+.sf-empty-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--ops-space-md);
+  text-align: center;
+  padding: var(--ops-space-xl);
+  color: #999;
+}
+
+/* ---- Mobile: stack lane columns instead of a squeezed row ---------------- */
+@media (max-width: 767px) {
+  .sf-lanes-row {
+    flex-direction: column;
+    min-width: 0;
+  }
+  .sf-lane-col {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .sf-inbox-assign {
+    width: 140px;
+  }
+}
