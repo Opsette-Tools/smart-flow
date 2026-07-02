@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useRef, useState } from "react";
-import { Button, Segmented, Typography } from "antd";
+import { Button, Segmented, Typography, Modal } from "antd";
 import { AppstoreOutlined, PartitionOutlined, SwapOutlined } from "@ant-design/icons";
 import { ThemeProvider } from "@/lib/theme";
 import Shell from "@/components/Shell";
@@ -9,6 +9,7 @@ import { DiagramView } from "./diagram/DiagramView";
 import { OutlineBuilder } from "./OutlineBuilder";
 import { ChooserModal } from "./ChooserModal";
 import { diagramInfo, type DiagramType } from "./diagramTypes";
+import type { Template } from "./templates";
 import {
   loadActiveType,
   saveActiveType,
@@ -54,6 +55,39 @@ function SmartFlow() {
 
   const setOutlineText = (type: OutlineType, text: string) =>
     setOutlineTexts((prev) => ({ ...prev, [type]: text }));
+
+  /** Does the diagram type a template targets already hold user content? */
+  const typeHasContent = (type: DiagramType): boolean =>
+    type === "swimlane"
+      ? doc.items.length > 0 || doc.lanes.length > 0
+      : !!outlineTexts[type as OutlineType]?.trim();
+
+  /** Apply a template: set it active and fill its content in the right store. */
+  const applyTemplate = (template: Template) => {
+    if (template.type === "swimlane" && template.makeDoc) {
+      dispatch({ type: "REPLACE_DOC", doc: template.makeDoc() });
+      setSwimMode("build");
+    } else if (template.outline !== undefined) {
+      setOutlineText(template.type as OutlineType, template.outline);
+    }
+    setActiveType(template.type);
+    saveActiveType(template.type);
+    setChooserOpen(false);
+  };
+
+  const handlePickTemplate = (template: Template) => {
+    if (typeHasContent(template.type)) {
+      Modal.confirm({
+        title: `Load "${template.name}"?`,
+        content: `This replaces your current ${diagramInfo(template.type).name.toLowerCase()}. It can't be undone.`,
+        okText: "Load template",
+        cancelText: "Cancel",
+        onOk: () => applyTemplate(template),
+      });
+    } else {
+      applyTemplate(template);
+    }
+  };
 
   const info = activeType ? diagramInfo(activeType) : null;
 
@@ -114,6 +148,7 @@ function SmartFlow() {
       <ChooserModal
         open={chooserOpen}
         onPick={handlePick}
+        onPickTemplate={handlePickTemplate}
         onClose={() => setChooserOpen(false)}
         dismissible={activeType !== null}
       />

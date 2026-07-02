@@ -1,28 +1,27 @@
 import { useState } from "react";
-import { Modal, Typography, Radio, Space, Button, Tag } from "antd";
+import { Modal, Typography, Radio, Space, Button, Tag, Tabs } from "antd";
 import { CheckCircleFilled } from "@ant-design/icons";
-import { DIAGRAM_TYPES, type DiagramType } from "./diagramTypes";
+import { DIAGRAM_TYPES, diagramInfo, type DiagramType } from "./diagramTypes";
+import { templatesByCategory, type Template } from "./templates";
 
 const { Title, Paragraph, Text } = Typography;
 
 interface Props {
   open: boolean;
   onPick: (type: DiagramType) => void;
+  onPickTemplate: (template: Template) => void;
   onClose: () => void;
   /** Hide the close affordance on the very first run (no diagram yet). */
   dismissible?: boolean;
 }
 
 /**
- * The guided "which diagram do I need?" model. It asks one plain-language
- * question — "What are you trying to show?" — with answers written in the
- * user's words, not diagram jargon. The matching answer recommends a type, but
- * the user is free to pick any of them. No flowchart knowledge required.
+ * The "get started" model. Two ways in, as tabs:
+ *   1. Diagram type — the plain-language "what are you trying to show?" chooser.
+ *   2. Start from a template — a browsable gallery of ready-made processes that
+ *      load the right diagram type, pre-filled and editable.
  */
-export function ChooserModal({ open, onPick, onClose, dismissible = true }: Props) {
-  const [selected, setSelected] = useState<DiagramType>("flowchart");
-  const chosen = DIAGRAM_TYPES.find((d) => d.type === selected)!;
-
+export function ChooserModal({ open, onPick, onPickTemplate, onClose, dismissible = true }: Props) {
   return (
     <Modal
       open={open}
@@ -31,10 +30,36 @@ export function ChooserModal({ open, onPick, onClose, dismissible = true }: Prop
       maskClosable={dismissible}
       keyboard={dismissible}
       footer={null}
-      width={620}
+      width={640}
       title={null}
     >
-      <Title level={4} style={{ marginTop: 0, marginBottom: 4 }}>
+      <Tabs
+        defaultActiveKey="type"
+        items={[
+          {
+            key: "type",
+            label: "Pick a diagram",
+            children: <TypeChooser onPick={onPick} />,
+          },
+          {
+            key: "template",
+            label: "Start from a template",
+            children: <TemplateGallery onPick={onPickTemplate} />,
+          },
+        ]}
+      />
+    </Modal>
+  );
+}
+
+/** Tab 1: choose a diagram type by what you're trying to show. */
+function TypeChooser({ onPick }: { onPick: (type: DiagramType) => void }) {
+  const [selected, setSelected] = useState<DiagramType>("flowchart");
+  const chosen = DIAGRAM_TYPES.find((d) => d.type === selected)!;
+
+  return (
+    <>
+      <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
         What are you trying to show?
       </Title>
       <Paragraph type="secondary" style={{ marginTop: 0 }}>
@@ -93,6 +118,44 @@ export function ChooserModal({ open, onPick, onClose, dismissible = true }: Prop
           Use {chosen.name}
         </Button>
       </div>
-    </Modal>
+    </>
+  );
+}
+
+/** Tab 2: browse ready-made processes and load one. */
+function TemplateGallery({ onPick }: { onPick: (template: Template) => void }) {
+  const groups = templatesByCategory();
+
+  return (
+    <>
+      <Paragraph type="secondary" style={{ marginTop: 0 }}>
+        Start with a real process you can edit. We'll load it as the right kind of
+        diagram — change anything you like once it's in.
+      </Paragraph>
+
+      <div className="sf-tpl-scroll">
+        {groups.map((group) => (
+          <section key={group.category} className="sf-tpl-group">
+            <h4 className="sf-tpl-cat">{group.category}</h4>
+            <div className="sf-tpl-grid">
+              {group.items.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="sf-tpl-card"
+                  onClick={() => onPick(t)}
+                >
+                  <span className="sf-tpl-card-top">
+                    <span className="sf-tpl-card-name">{t.name}</span>
+                    <Tag className="sf-tpl-card-tag">{diagramInfo(t.type).name}</Tag>
+                  </span>
+                  <span className="sf-tpl-card-blurb">{t.blurb}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </>
   );
 }

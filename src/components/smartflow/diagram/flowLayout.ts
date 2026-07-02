@@ -27,6 +27,69 @@ function isDecision(label: string): boolean {
   return label.trim().endsWith("?");
 }
 
+/**
+ * A "No" branch is TERMINAL when it ends the path rather than handling an
+ * exception that rejoins the flow. We infer this from the words, so the user
+ * never learns syntax: a No box that reads like an ending (decline, close,
+ * stop, reject, and so on) becomes an endpoint with no loop-back. Anything
+ * else is treated as a recoverable exception that resolves and carries on.
+ */
+const TERMINAL_HINTS = [
+  "decline",
+  "declined",
+  "close",
+  "closed",
+  "stop",
+  "end",
+  "reject",
+  "rejected",
+  "exit",
+  "abandon",
+  "cancel",
+  "cancelled",
+  "canceled",
+  "walk away",
+  "no-go",
+  "no go",
+  "lost",
+  "loss",
+  "dead",
+  "drop",
+  "kill",
+];
+
+function isTerminalBranch(label: string): boolean {
+  const l = label.toLowerCase();
+  return TERMINAL_HINTS.some((h) => l.includes(h));
+}
+
+/**
+ * A "skip" branch is an either/or fork where the No path DOESN'T do the extra
+ * Yes step — it bypasses it and rejoins the flow at the NEXT step (both paths
+ * land on the same following box). This is the common "do X only if needed"
+ * shape, e.g. "New dietary ingredient? → No: already on the market" skips the
+ * NDI-filing step. We infer it from words that mean "not needed / carry on
+ * without it" rather than "an exception to resolve first."
+ */
+const SKIP_HINTS = [
+  "skip",
+  "already",
+  "no need",
+  "not needed",
+  "not required",
+  "n/a",
+  "none needed",
+  "bypass",
+  "continue without",
+  "proceed without",
+  "keep",
+];
+
+function isSkipBranch(label: string): boolean {
+  const l = label.toLowerCase();
+  return SKIP_HINTS.some((h) => l.includes(h));
+}
+
 export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): FlowLayoutResult {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -72,20 +135,32 @@ export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): Flo
     });
   };
 
-  // Side offset for a "No" exception box: sits to the right of the spine.
+  // Side offset for a "No" branch box: sits to the right of the spine.
   const SIDE_X = centerX + STEP_W + BRANCH_GAP;
+
+  // "Skip" No boxes waiting to be wired forward into the NEXT spine step they
+  // land on (an either/or fork where No bypasses the Yes step).
+  let pendingMerges: string[] = [];
+
+  const flushMergesInto = (targetId: string) => {
+    for (const fromId of pendingMerges) link(fromId, targetId, undefined, "s-bottom", "t-right");
+    pendingMerges = [];
+  };
 
   for (const step of roots) {
     const decision = isDecision(step.label);
     pushNode(step, centerX, decision ? "decisionNode" : "itemNode");
     if (prevId) link(prevId, step.id, undefined, prevHandle);
+    // A skip-No from an earlier decision merges forward into this step.
+    flushMergesInto(step.id);
 
     if (decision && step.children.length > 0) {
       // Spine pattern: the FIRST child (the "Yes"/main path) continues straight
       // down the center spine and the flow keeps going from it. The SECOND child
-      // (the "No"/exception) peels off to the right, then loops back to the
-      // decision so it reads as "handle the exception, then carry on" — no
-      // duplicated boxes, no dead ends.
+      // (the "No") is one of three shapes, decided by its wording:
+      //   - terminal  → a dead-end off-ramp (decline, lost); no outgoing edge.
+      //   - skip      → bypasses the Yes step; merges into the NEXT spine step.
+      //   - exception → resolves, then loops back to the Yes box (the default).
       const yesChild = step.children[0];
       const noChild = step.children[1];
 
@@ -94,11 +169,13 @@ export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): Flo
       pushNode(yesChild, centerX, "itemNode");
       link(step.id, yesChild.id, "Yes", "s-bottom", "t-top");
 
-      // "No" — exception box to the right, level with the decision's Yes child.
+      // "No" — box to the right, level with the decision's Yes child.
       if (noChild) {
+        const terminal = isTerminalBranch(noChild.label);
+        const skip = !terminal && isSkipBranch(noChild.label);
         nodes.push({
           id: noChild.id,
-          type: "itemNode",
+          type: terminal ? "endpointNode" : "itemNode",
           position: { x: SIDE_X, y },
           data: { label: noChild.label },
           draggable: false,
@@ -106,11 +183,17 @@ export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): Flo
           width: STEP_W,
           style: { width: STEP_W, minHeight: STEP_H, zIndex: 1 },
         });
-        // Decision → No (out the right). The exception is handled, then rejoins
-        // the main path at the Yes box (forward, not a re-test loop) — reads as
-        // "resolve this, then carry on."
+        // Decision → No (out the right).
         link(step.id, noChild.id, "No", "s-right", "t-top");
-        link(noChild.id, yesChild.id, undefined, "s-bottom", "t-right");
+        if (terminal) {
+          // Dead-end: no outgoing edge.
+        } else if (skip) {
+          // Bypass the Yes step — merge forward into the next spine step.
+          pendingMerges.push(noChild.id);
+        } else {
+          // Recoverable exception: resolve, then rejoin at the Yes box.
+          link(noChild.id, yesChild.id, undefined, "s-bottom", "t-right");
+        }
       }
 
       // Main flow continues from the Yes box.

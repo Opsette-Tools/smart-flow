@@ -68,6 +68,93 @@ html.dark .sf-chooser-option.is-selected {
   border-color: var(--ops-gold);
 }
 
+/* ---- Template gallery (chooser tab 2) ------------------------------------ */
+.sf-tpl-scroll {
+  max-height: min(56vh, 520px);
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+.sf-tpl-group {
+  margin-bottom: var(--ops-space-lg);
+}
+.sf-tpl-group:last-child {
+  margin-bottom: 0;
+}
+.sf-tpl-cat {
+  font-size: var(--ops-fs-fine);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ops-green);
+  margin: 0 0 var(--ops-space-sm);
+}
+html.dark .sf-tpl-cat {
+  color: var(--ops-gold);
+}
+.sf-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ops-space-sm);
+}
+.sf-tpl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  background: var(--sf-card-bg, #fff);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.sf-tpl-card:hover {
+  border-color: var(--ops-green-light);
+  background: rgba(47, 79, 70, 0.04);
+}
+html.dark .sf-tpl-card {
+  --sf-border: #303030;
+  --sf-card-bg: #1d1d1d;
+}
+html.dark .sf-tpl-card:hover {
+  border-color: var(--ops-gold);
+  background: rgba(207, 174, 96, 0.08);
+}
+.sf-tpl-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sf-tpl-card-name {
+  font-size: var(--ops-fs-body);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.sf-tpl-card-tag {
+  flex: 0 0 auto;
+  margin-inline-end: 0;
+}
+.sf-tpl-card-blurb {
+  font-size: var(--ops-fs-fine);
+  color: #888;
+  line-height: 1.4;
+}
+html.dark .sf-tpl-card-blurb {
+  color: #9a9a9a;
+}
+@media (max-width: 575px) {
+  .sf-tpl-grid {
+    grid-template-columns: 1fr;
+  }
+  .sf-tpl-card-top {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
 /* Section intro line shown above a panel */
 .sf-section-head {
   display: flex;
@@ -378,6 +465,23 @@ html.dark .sf-diagram-frame {
   justify-content: center;
   text-align: center;
   font-weight: 600;
+}
+
+/* Terminal endpoint — a muted, dashed off-ramp (decline, loss, stop). Reads as
+   an ending, not a step the flow continues from. */
+.sf-rf-endpoint {
+  border-style: dashed;
+  border-color: #c4644f;
+  background: rgba(196, 100, 79, 0.08);
+  color: #8a3f30;
+  justify-content: center;
+  text-align: center;
+  font-weight: 600;
+}
+html.dark .sf-rf-endpoint {
+  border-color: #d98a76;
+  background: rgba(196, 100, 79, 0.16);
+  color: #e9b3a5;
 }
 
 /* Timeline milestone — taller card with a top accent bar. */

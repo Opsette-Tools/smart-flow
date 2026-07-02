@@ -73,6 +73,17 @@ export function DecisionNode({ data }: NodeProps<{ label: string }>) {
   );
 }
 
+/** A terminal endpoint — the path ends here (a decline, a loss, a stop). Muted
+ *  so it reads as an off-ramp rather than a step the flow continues from. */
+export function EndpointNode({ data }: NodeProps<{ label: string }>) {
+  return (
+    <div className="sf-rf-item sf-rf-endpoint">
+      <Anchors />
+      <span style={{ ...wrapLabel, textAlign: "center" }}>{data.label}</span>
+    </div>
+  );
+}
+
 /** A timeline milestone — bigger, with an optional sub-note line. */
 export function MilestoneNode({ data }: NodeProps<{ label: string; note?: string }>) {
   return (
@@ -92,5 +103,6 @@ export const nodeTypes = {
   laneNode: LaneNode,
   itemNode: ItemNode,
   decisionNode: DecisionNode,
+  endpointNode: EndpointNode,
   milestoneNode: MilestoneNode,
 };

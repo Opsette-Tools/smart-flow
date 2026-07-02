@@ -13,6 +13,7 @@
 
 import type { Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
 import { uuid } from "@/lib/uuid";
+import { leadToClientDoc } from "./templates";
 
 const STORAGE_KEY = "smart-flow-doc";
 
@@ -23,38 +24,12 @@ const STORAGE_KEY = "smart-flow-doc";
 export const emptyDoc: SmartFlowDoc = { lanes: [], items: [] };
 
 /**
- * First-run seed: the product-development pipeline from the build brief, so a
- * brand-new user lands on something real rather than a blank canvas. Lanes are
- * departments; a couple of items hand off across lanes.
+ * First-run swimlane example, so a user who opens the swimlane can see a real
+ * process rather than a blank board. This is the same content as the
+ * "Lead to paying client" template — kept in one place in templates.ts.
  */
 export function seedDoc(): SmartFlowDoc {
-  const sales = uuid();
-  const product = uuid();
-  const ops = uuid();
-
-  const intake = uuid();
-  const qualify = uuid();
-  const negotiate = uuid();
-  const bid = uuid();
-  const build = uuid();
-  const launch = uuid();
-
-  const lanes: Lane[] = [
-    { id: sales, name: "Sales", order: 0 },
-    { id: product, name: "Product", order: 1 },
-    { id: ops, name: "Operations", order: 2 },
-  ];
-
-  const items: Item[] = [
-    { id: intake, label: "Lead intake", laneId: sales, order: 0, connectsTo: [qualify] },
-    { id: qualify, label: "Qualify", laneId: sales, order: 1, connectsTo: [negotiate] },
-    { id: negotiate, label: "Negotiation", laneId: sales, order: 2, connectsTo: [bid] },
-    { id: bid, label: "Scope & bid", laneId: product, order: 0, connectsTo: [build] },
-    { id: build, label: "Build", laneId: product, order: 1, connectsTo: [launch] },
-    { id: launch, label: "Launch", laneId: ops, order: 0, connectsTo: [] },
-  ];
-
-  return { lanes, items };
+  return leadToClientDoc();
 }
 
 // ---------------------------------------------------------------------------
