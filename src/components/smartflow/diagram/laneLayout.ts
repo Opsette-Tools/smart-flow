@@ -71,6 +71,8 @@ export function buildLayout(
   const nodes: Node[] = [];
   const itemX = new Map<string, number>();
   const itemY = new Map<string, number>();
+  /** Row index within the lane — lets us tell "the very next card" from "further down". */
+  const itemRow = new Map<string, number>();
 
   lanes.forEach((lane, colIdx) => {
     const laneX = colIdx * (LANE_WIDTH + LANE_GAP);
@@ -92,6 +94,7 @@ export function buildLayout(
       const y = LANE_TOP + LANE_HEADER_H + ITEM_TOP_PAD + rowIdx * (ITEM_HEIGHT + ITEM_GAP);
       itemX.set(item.id, x);
       itemY.set(item.id, y);
+      itemRow.set(item.id, rowIdx);
       nodes.push({
         id: item.id,
         type: "itemNode",
@@ -110,20 +113,36 @@ export function buildLayout(
   });
 
   // Edges — one per connection that points at a rendered (placed) item.
-  // Pick handles by geometry so routing reads naturally: a same-column handoff
-  // that flows downward exits the bottom and enters the top; anything else
-  // (cross-lane, or pointing left/up) exits the right and enters the left.
+  //
+  // Handle choice is load-bearing, and getting it wrong draws connections the
+  // user never made. Two rules, both learned from real misreads:
+  //
+  // 1. Bottom→top routing is ONLY for a step connecting to the card directly
+  //    beneath it. A same-lane edge that SKIPS a card must not run down the
+  //    column — it would pass through the intervening card and enter the
+  //    target's top edge, which reads exactly like a chain of two separate
+  //    arrows. (A branch — one step feeding two below it — hit this: the
+  //    skipping edge looked like the passed-over card fed the far one.)
+  //
+  // 2. Every other edge exits right and re-enters left, and gets a horizontal
+  //    offset so its vertical run happens in the gutter BETWEEN lanes rather
+  //    than inside the column, where it would tunnel behind the cards above.
   const placed = new Set(itemX.keys());
   const edgeColor = isDark ? "#cfae60" : "#426f62";
   const edges: Edge[] = [];
+  /** How many sideways edges have already left a given source — fans them apart. */
+  const sideways = new Map<string, number>();
   for (const item of doc.items) {
     if (!placed.has(item.id)) continue;
     const detail = new Map((item.connections ?? []).map((c) => [c.toId, c] as const));
     for (const targetId of item.connectsTo) {
       if (!placed.has(targetId)) continue;
       const sameColumn = itemX.get(item.id) === itemX.get(targetId);
-      const downward = (itemY.get(targetId) ?? 0) > (itemY.get(item.id) ?? 0);
-      const vertical = sameColumn && downward;
+      const srcRow = itemRow.get(item.id) ?? 0;
+      const tgtRow = itemRow.get(targetId) ?? 0;
+      // Rule 1: straight down ONLY to the immediately-next card. Anything that
+      // skips a row routes around instead, so it can't be misread as a chain.
+      const vertical = sameColumn && tgtRow === srcRow + 1;
 
       const conn = annotate ? detail.get(targetId) : undefined;
       const stroke = annotate ? edgeColorFor(conn?.mechanism, isDark, edgeColor) : edgeColor;
@@ -136,6 +155,15 @@ export function buildLayout(
             ? conn.systemName
             : mechanismLabel(conn.mechanism);
 
+      // Rule 2: fan the sideways edges apart. smoothstep turns `offset` px
+      // after leaving the source, so a per-edge offset moves each vertical run
+      // into its own track in the lane gutter instead of stacking them all on
+      // one line (and on top of the cards in between). Edges leaving the same
+      // source get distinct tracks; the deeper the row, the wider the berth.
+      const fanIndex = sideways.get(item.id) ?? 0;
+      if (!vertical) sideways.set(item.id, fanIndex + 1);
+      const offset = vertical ? undefined : ITEM_INSET_X + 6 + fanIndex * 9;
+
       edges.push({
         id: `e:${item.id}->${targetId}`,
         source: item.id,
@@ -143,6 +171,7 @@ export function buildLayout(
         sourceHandle: vertical ? "s-bottom" : "s-right",
         targetHandle: vertical ? "t-top" : "t-left",
         type: "smoothstep",
+        pathOptions: { offset, borderRadius: 8 },
         animated: false,
         label,
         labelShowBg: true,

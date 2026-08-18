@@ -346,3 +346,66 @@ this tool. Markdown-in-a-textarea was tried first and rejected on sight.
   that component is shared across all sixteen tools and deserves its own session.
 - **Sticky Build/Diagram toggle** — would save real scrolling during a live session.
 - The 375px pass still hasn't happened.
+
+### FIXED 2026-08-18 — the diagram drew connections that did not exist
+
+Found on a real 21-step client board, minutes before a client call. **This was the worst
+possible class of bug for this tool**: the diagram is supposed to be the trustworthy
+artifact, and it was inventing handoffs. Two distinct causes in `laneLayout.ts`, both in
+the handle-selection logic:
+
+1. **Same-lane branches.** The rule was `vertical = sameColumn && downward`, so *every*
+   downward same-lane edge routed bottom→top. When one step connected to two steps below
+   it, the edge that skipped a card ran down the column, passed through the intervening
+   card, and entered the far target's **top** handle — visually identical to a chain of two
+   separate arrows. A step that fed two others read as a straight sequence through a card
+   it never touched.
+   **Fix:** bottom→top routing now requires the target to be the *immediately next* row
+   (`tgtRow === srcRow + 1`). Anything that skips a row routes sideways instead.
+
+2. **Cross-lane edges from lower rows.** All non-vertical edges used the default
+   smoothstep path, whose vertical run happens inside the source lane's column band — so
+   an edge leaving row 3 tunneled up behind rows 0–2 on its way out. With four steps
+   converging on one target, the stacked runs read as an arrow from the *top* card.
+   **Fix:** per-edge `pathOptions.offset`, incremented per sideways edge leaving a given
+   source, so each vertical run gets its own track in the lane gutter rather than stacking
+   on one line over the cards.
+
+Verified by simulating the real client board: all 22 connections now route as either
+"straight down to the adjacent card" or "sideways on its own track" — no edge passes
+through a card it isn't connected to.
+
+**Lesson worth keeping:** a step structure that branches *within* a lane was never
+render-tested. Any future layout change should be checked against a board with (a) one
+step feeding two others in the same lane, and (b) three-plus steps in one lane converging
+on a single step in another.
+
+### Bulk entry — the manual-labor complaints (raised 2026-08-18, filling in a real board)
+
+Three related gaps, all found while building a 21-step board from a prepared doc. The
+common thread: **the app assumes steps arrive one at a time and get wired one at a time.**
+When you come in with the structure already worked out, every one of those assumptions
+costs a click. Worth taking as a group — they're the same problem at three sizes.
+
+1. **Paste straight into a lane.** The inbox textarea drops everything into the unsorted
+   pile, and each item then needs an individual lane assignment. There should be a lane
+   picker on the paste itself — paste twenty lines, choose Definition, done. `LaneColumn`
+   already has a per-lane textarea, so the primitive exists; the inbox just can't reach it.
+   *(Check first whether the per-lane paste already covers this — if it does, the real bug
+   is that the inbox is the obvious path and the better one is hidden.)*
+
+2. **Chain-connect a lane in order.** For a linear stretch, connecting each step to the
+   next is pure transcription — the order is already on screen. One action per lane
+   ("connect these in order") that wires step 1→2→3 down the column would eliminate most
+   of the connection work. The spine of a process is usually the majority of its arrows;
+   the interesting ones are the exceptions that cross lanes.
+
+3. **Bulk update.** Multi-select cards and set a field on all of them at once — most
+   obviously system of record, where whole lanes often share one answer ("all of Sourcing
+   lives in spreadsheets"). Applies to mechanism too.
+
+**Design note:** chain-connect must be an explicit action, never automatic. Inferring
+connections from vertical order would violate the founding rule that nothing is ever
+inferred — the difference between "these are adjacent" and "these are connected" is real,
+and an unconnected step is itself a finding the gaps panel reports on. The fix is to make
+the explicit action cheap, not to remove it.
