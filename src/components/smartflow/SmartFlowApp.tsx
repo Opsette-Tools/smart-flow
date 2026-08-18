@@ -136,10 +136,13 @@ function SmartFlow() {
           onChange={(t) => setOutlineText(activeType as OutlineType, t)}
         />
       ) : (
-        // No type chosen yet and chooser dismissed somehow — offer to open it.
+        // Chooser dismissed without picking. A real landing state, not a dead
+        // end — the toolbar above it is reachable, so theme/share still work.
         <div className="sf-empty-diagram" style={{ minHeight: "40vh" }}>
-          <Text type="secondary">Pick a diagram to get started.</Text>
-          <Button type="primary" onClick={() => setChooserOpen(true)}>
+          <Text type="secondary">
+            Nothing on the board yet. Pick the kind of diagram you need and we'll set it up.
+          </Text>
+          <Button type="primary" size="large" onClick={() => setChooserOpen(true)}>
             Choose a diagram
           </Button>
         </div>
@@ -150,7 +153,6 @@ function SmartFlow() {
         onPick={handlePick}
         onPickTemplate={handlePickTemplate}
         onClose={() => setChooserOpen(false)}
-        dismissible={activeType !== null}
       />
     </main>
   );

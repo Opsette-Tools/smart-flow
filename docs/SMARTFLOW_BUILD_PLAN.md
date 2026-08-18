@@ -205,3 +205,17 @@ SmartFlow is a **new** tool, so finishing the build means registering it everywh
 **Family registry** — added SmartFlow rows to `HEAD_AND_MANIFEST.md`, `ICONS_AND_BRANDING.md` (OG ✅), and `HEADER_BAR.md` (also backfilled the missing palette-studio/icon-kit/frame-board/startup-planner rows and removed the stale deleted `space-planner` row). Apex landing card added (productivity, accent `#2f4f46`). `DEV_SERVERS.md` row added (8123).
 
 **Left to do:** (1) Ruthnie verifies in the running app — especially DnD on touch and the PNG export crop. (2) Then full `vite build` + commit (smart-flow repo + apex repo + the shared-docs changes). (3) Stretch (not built): SVG/PDF export.
+
+### 2026-08-18 — Dark-mode fixes in the chooser (working agent)
+
+Two bugs Ruthnie hit on landing, both fixed and typechecking clean (`npx tsc -b`, exit 0; eslint clean on both changed files). **Not yet verified in-app, not committed.**
+
+**1. First-run chooser trapped the user.** `SmartFlowApp.tsx` passed `dismissible={activeType !== null}`, so on a fresh visit the modal had no close button, no mask-click, and no Esc. Since the mask covers the header, the theme toggle and share button were both unreachable until a diagram type was committed to — the app was literally unconfigurable on arrival. The prop is gone; the chooser is now always dismissible. The `sf-empty-diagram` landing state that catches a dismissal already existed but was dead code — its copy is now written for a real user who lands there on purpose.
+
+**2. Chooser modal was near-unreadable in dark mode.** Root cause was a surface-stacking inversion: template cards were `#1d1d1d` sitting on AntD's `#1f1f1f` dark modal body, so cards rendered *darker than the surface beneath them* and read as holes rather than raised cards. Borders at `#303030` on `#1f1f1f` were roughly 1.2:1 — effectively invisible, which matches the screenshot. Fixes in `smartflow.css`:
+- Card and chooser-row surfaces lifted to `#262625` (above the modal body), borders to `#43433f`.
+- Modal content itself lifted to `#1f1f1e` with a `#3a3a37` edge, so the panel reads as a panel instead of a void.
+- Inactive tab labels lifted from AntD's default near-`#5c5c5c` to `#a8a69d` ("Start from a template" was barely legible); active tab and ink bar now carry the brand gold.
+- Card blurb `#9a9a9a` → `#b9b7ae` and card name → `#f0efe9`, both clearing AA on the new surface.
+
+**New doc:** `docs/DISCOVERY_SWIMLANE_PLAN.md` — plan for turning the swimlane into a process-discovery instrument (handoff mechanism per connection, system of record + open question per step, and a derived gaps panel). Includes the reasoning for **rejecting a value stream map** as the wrong artifact for interview-based discovery. Not built.

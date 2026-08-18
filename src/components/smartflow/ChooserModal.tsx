@@ -11,8 +11,6 @@ interface Props {
   onPick: (type: DiagramType) => void;
   onPickTemplate: (template: Template) => void;
   onClose: () => void;
-  /** Hide the close affordance on the very first run (no diagram yet). */
-  dismissible?: boolean;
 }
 
 /**
@@ -21,17 +19,21 @@ interface Props {
  *   2. Start from a template — a browsable gallery of ready-made processes that
  *      load the right diagram type, pre-filled and editable.
  */
-export function ChooserModal({ open, onPick, onPickTemplate, onClose, dismissible = true }: Props) {
+export function ChooserModal({ open, onPick, onPickTemplate, onClose }: Props) {
   return (
     <Modal
       open={open}
-      onCancel={dismissible ? onClose : undefined}
-      closable={dismissible}
-      maskClosable={dismissible}
-      keyboard={dismissible}
+      onCancel={onClose}
+      // Always dismissible, including on first run. Trapping the user here also
+      // traps the header behind the mask — the theme toggle and share button
+      // live up there, so a locked modal makes the app unconfigurable on land.
+      closable
+      maskClosable
+      keyboard
       footer={null}
-      width={640}
+      width={680}
       title={null}
+      className="sf-chooser-modal"
     >
       <Tabs
         defaultActiveKey="type"

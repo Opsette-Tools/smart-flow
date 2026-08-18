@@ -61,10 +61,18 @@
   background: rgba(47, 79, 70, 0.05);
 }
 html.dark .sf-chooser-option {
-  --sf-border: #303030;
+  /* AntD's dark modal body is #1f1f1f. A card must sit ABOVE its surface to
+     read as a card — #1d1d1d sat below it and read as a hole. Both the fill
+     and the border are lifted so the row has a visible edge on its own. */
+  --sf-border: #43433f;
+  background: #262625;
+}
+html.dark .sf-chooser-option:hover {
+  border-color: var(--ops-gold);
+  background: #2e2e2c;
 }
 html.dark .sf-chooser-option.is-selected {
-  background: rgba(207, 174, 96, 0.1);
+  background: rgba(207, 174, 96, 0.14);
   border-color: var(--ops-gold);
 }
 
@@ -92,6 +100,32 @@ html.dark .sf-chooser-option.is-selected {
 html.dark .sf-tpl-cat {
   color: var(--ops-gold);
 }
+
+/* ---- Chooser modal shell -------------------------------------------------
+   The modal is the app's front door, so its own surface gets lifted in dark
+   mode too — otherwise the raised cards inside float on near-black and the
+   whole panel reads as one flat void (which is what it was doing). */
+html.dark .sf-chooser-modal .ant-modal-content {
+  background: #1f1f1e;
+  border: 1px solid #3a3a37;
+}
+/* The inactive tab label was ~#5c5c5c on near-black — effectively unreadable.
+   Lift the resting state and let the active tab carry the gold. */
+html.dark .sf-chooser-modal .ant-tabs-tab .ant-tabs-tab-btn {
+  color: #a8a69d;
+}
+html.dark .sf-chooser-modal .ant-tabs-tab:hover .ant-tabs-tab-btn {
+  color: #d9d7cd;
+}
+html.dark .sf-chooser-modal .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--ops-gold);
+}
+html.dark .sf-chooser-modal .ant-tabs-ink-bar {
+  background: var(--ops-gold);
+}
+html.dark .sf-chooser-modal .ant-tabs-nav::before {
+  border-bottom-color: #3a3a37;
+}
 .sf-tpl-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -115,12 +149,15 @@ html.dark .sf-tpl-cat {
   background: rgba(47, 79, 70, 0.04);
 }
 html.dark .sf-tpl-card {
-  --sf-border: #303030;
-  --sf-card-bg: #1d1d1d;
+  /* Same lift as the chooser rows: raised off the #1f1f1f modal body, with a
+     border light enough to actually trace the card's edge. The old #303030 on
+     #1f1f1f was roughly 1.2:1 — invisible in practice. */
+  --sf-border: #43433f;
+  --sf-card-bg: #262625;
 }
 html.dark .sf-tpl-card:hover {
   border-color: var(--ops-gold);
-  background: rgba(207, 174, 96, 0.08);
+  background: #322f28;
 }
 .sf-tpl-card-top {
   display: flex;
@@ -133,6 +170,9 @@ html.dark .sf-tpl-card:hover {
   font-weight: 600;
   line-height: 1.3;
 }
+html.dark .sf-tpl-card-name {
+  color: #f0efe9;
+}
 .sf-tpl-card-tag {
   flex: 0 0 auto;
   margin-inline-end: 0;
@@ -143,7 +183,8 @@ html.dark .sf-tpl-card:hover {
   line-height: 1.4;
 }
 html.dark .sf-tpl-card-blurb {
-  color: #9a9a9a;
+  /* #9a9a9a on the raised card was under 4.5:1. This clears AA for body text. */
+  color: #b9b7ae;
 }
 @media (max-width: 575px) {
   .sf-tpl-grid {
