@@ -127,7 +127,7 @@ function SmartFlow() {
         swimMode === "build" ? (
           <BuildMode doc={doc} dispatch={dispatch} onViewDiagram={() => setSwimMode("diagram")} />
         ) : (
-          <DiagramView doc={doc} onBackToBuild={() => setSwimMode("build")} />
+          <DiagramView doc={doc} dispatch={dispatch} onBackToBuild={() => setSwimMode("build")} />
         )
       ) : activeType ? (
         <OutlineBuilder

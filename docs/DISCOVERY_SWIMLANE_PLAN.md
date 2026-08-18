@@ -1,6 +1,6 @@
 # SmartFlow — Discovery Swimlane
 
-**Status:** Planned, not built (2026-08-18)
+**Status:** Built 2026-08-18 — awaiting in-app verification (see Progress log)
 **Scope:** An additive layer on the existing swimlane. No new diagram type, no rebuild.
 **Origin:** Ruthnie is running a real client engagement — a contract manufacturer being set up on a Monday board. The first meeting is a process-discovery interview. SmartFlow can hold the shape of that conversation today, but not the findings.
 
@@ -186,4 +186,163 @@ Two notes worth carrying into the build:
 
 ## Progress log
 
-_(Append dated entries here when the build runs.)_
+### 2026-08-18 — All seven steps done. Awaiting verification in the app.
+
+**Status:** Feature-complete against §5. Typecheck clean, lint clean (one pre-existing
+`react-refresh` warning in `nodes.tsx`, untouched by this work). Not yet verified in
+the running app, not yet committed.
+
+**Two §7 questions resolved, both deliberately:**
+
+- **Mechanism list: kept all eight, did not collapse to five.** The plan's own argument
+  beats its hedge — the list is a maturity ladder and the discriminations *are* the
+  findings. "Email" vs. "text/chat" separates an automatable handoff from one that
+  isn't. "Paper form" is the loudest single finding on a manufacturing floor and
+  folding it into "system" would erase it. Capture speed comes from worst-first
+  ordering and a searchable select, not from a shorter list. Revisit only if it
+  actually drags in a live meeting.
+- **Gaps panel lives under the diagram, not as a third mode.** Promoting it to
+  top-level navigation doubles the nav cost for something not yet proven in a real
+  interview. Revisit after the first engagement.
+
+**What shipped, by step:**
+
+1. **Model + migration** — `types.ts` gained `HandoffMechanism`, the `MECHANISMS` list
+   (single source for select, edge labels, and read-out), `isManualMechanism`,
+   `Connection`, and the three optional `Item` fields. `SmartFlowDoc.discovery` is the
+   per-doc flag. `store.ts` reads `v: 1 | 2` and writes `v: 2`; the v1→v2 read is a
+   no-op as designed. Verified against a real v1 payload: lanes, items, labels, and
+   `connectsTo` all load intact, `discovery` defaults off, no phantom sidecars, and
+   unknown-version / corrupt payloads are rejected rather than crashing.
+2. **Discovery toggle** — `SET_DISCOVERY`, a switch in BuildMode's action row,
+   persisted with the doc. One deviation worth noting: **`RESET` now preserves the
+   flag.** Wiping the board mid-interview shouldn't silently drop you out of discovery
+   mode. Content clears; the mode does not.
+3. **Capture UI** — `ConnectionEditor` renders a mechanism row per connection, with the
+   free-text system-name input appearing only for "Existing system". `LaneItemCard`
+   grew a Details disclosure (open by default in discovery, absent entirely outside
+   it) holding system-of-record and open-question, plus a gold flag in the card header
+   when a question is set. Both free-text inputs are uncontrolled and commit on
+   blur/Enter — a live typist shouldn't dispatch per keystroke — and are keyed to their
+   doc value so a template load reseeds them.
+4. **Gaps panel** — split into `diagram/gaps.ts` (pure derivation, no React) and
+   `diagram/GapsPanel.tsx` (presentation). The split is deliberate: the Monday-export
+   idea in §7 can consume `computeGaps()` directly without touching UI. Seven sections;
+   `unaskedHandoffs` was added beyond §2.4 because "drawn but never asked about" is the
+   single most actionable thing to see *while the client is still in the room*.
+5. **Diagram annotation** — `buildLayout(doc, isDark, annotate)`. Manual mechanisms
+   render warm (`#b4653a` / `#d98c5f` dark), system and automated render muted sage;
+   an unasked arrow keeps the default color, since "not asked yet" is not a finding.
+   Edge labels show the system's *name* when one was given, not the generic word.
+   Steps with an open question get a corner dot. Export became a dropdown in discovery
+   mode — clean for the client, annotated for the working copy — and stays a plain
+   button otherwise, so non-discovery behavior is byte-identical to before.
+6. **Mobile** — mechanism rows and detail fields are full-width stacked at every width
+   (not just narrow), the toggle row stacks under 575px, and the gaps panel is an
+   accordion with counts on the collapsed headers. **Still needs a real 375px pass with
+   a ten-step doc loaded — that's device work, not something confirmable from here.**
+7. **Template** — `cmDiscoveryDoc()`, registered first in Contract manufacturing.
+   Deliberately incomplete per §6: QA and QC are separate lanes, Regulatory is its own
+   lane, several steps are intentional orphans, no handoff carries a mechanism, and no
+   step carries a system of record. Nine open questions are planted as the starting
+   agenda. `buildSwimDoc` gained optional per-step seeds and a `{ discovery: true }`
+   option; all existing callers are unchanged.
+
+**Verification run:** 27 reducer/derivation checks and 11 migration checks, all passing
+— sidecar pruning when an arrow or its target step is deleted, system-name clearing
+when the mechanism changes away from "system", empty sidecars collapsing to `undefined`
+rather than `[]`, inbox items excluded from every finding, worst-first ranking, and
+case-insensitive system inventory that displays the first spelling typed. Scratch test
+files were removed after running.
+
+**Left for Ruthnie:**
+
+- Verify in the running app, especially the export dropdown (clean vs. annotated) — the
+  capture waits two animation frames for React Flow to lay out edge labels before
+  snapshotting, and that timing deserves a real look.
+- The 375px pass from step 6.
+- `npx tsc --noEmit` is the correct typecheck for this project — it has a single
+  tsconfig with `include`, not the `"files": []` root that makes `--noEmit` a false
+  green in the other Opsette tools. `tsc -b` is not needed here.
+
+---
+
+### 2026-08-18 (later) — Rework after first real use
+
+Ruthnie ran the built version and pushed back hard on several things. Most of the
+pushback was correct and exposed the same underlying mistake more than once: **the tool
+was encoding assumptions the data did not support, and encoding one user's workflow into
+a public tool.** Notes below so the reasoning survives.
+
+**Bugs found and fixed**
+
+- **Automated handoffs vanished.** `computeGaps` collected unasked and manual handoffs
+  and silently dropped everything else, so marking a handoff "automated" or "existing
+  system" made it disappear — indistinguishable from never asking. Now every answered
+  handoff is kept (`answeredHandoffs`), with `manualHandoffs` as a view over it.
+- **`undefined` chip.** `maxTagCount="responsive"` renders its "+N" overflow chip through
+  the custom `tagRender`, with no value. We printed `String(undefined)`. Guarded.
+- **Lane name repeated.** Connection labels read "Delivery · Process Engineering" while
+  standing in Delivery. The lane prefix now only appears when the handoff crosses lanes.
+- **Amber tint never applied to the select.** antd's `.ant-select-outlined
+  .ant-select-selector` outranks a single class. Fixed with a matching-specificity rule.
+- **Mechanism row was a fragment.** "→ Process Engineering" with a "How does it move?"
+  box required remembering which step you were in. Both ends are named now.
+
+**Assumptions removed (the recurring theme)**
+
+- **Closed mechanism dropdown → free text.** A discovery tool exists to capture mess;
+  a fixed list only captures mess we anticipated. Known values are suggestions now, and
+  anything typed is stored verbatim as `{ custom: string }`.
+- **Worst-first "manual handoffs" ranking → dropped as the organizing principle.** The
+  panel was presenting our heuristic as a measurement. Section is now "Handoffs" and
+  shows everything; the manual count survives as one line of context.
+- **Blank field ≠ finding.** "Steps with no system of record" was counting empty form
+  fields and reporting them as discoveries about the client's business. Split into
+  `recordedNowhere` (client said nowhere — a finding) and `systemNotAsked` (blank — your
+  to-do), rendered in two visually separate blocks.
+- **Custom values still assume manual.** Known limitation: type "Zapier" and it counts as
+  hand-carried. Word-matching would break on the next tool name, so this stands until
+  there is a better answer. Ruthnie chose to work around it by using "automated".
+
+**Copy pass (VOICE.md applied)**
+
+The rule used throughout: name the real object, no pronouns, no generic nouns. Field
+labels are now the source of truth and the panel quotes them back, so every section names
+something findable on the build page:
+
+| Field | Was | Now |
+|---|---|---|
+| mechanism | "How does it move?" | **Handoff method** |
+| system | "Where does this live?" | **Storage system** |
+
+Sections: Handoffs · Outstanding questions · Steps with no record · Systems in use ·
+Steps with no connections · Where lanes connect · Not filled in yet (with **Handoffs with
+no method** and **Steps with no storage system**).
+
+Deleted, not replaced: the "this is yours, not the client-facing diagram" note, all
+Monday/meeting/room/client/interview language, "the seam where work gets dropped", "the
+strongest argument for building them a system". Export menu is now "Diagram only" /
+"Diagram with handoff labels".
+
+**Header condensed** — four stacked rows to two. Lanes went horizontal (heading, input,
+chips on one line), the inbox collapses to a single row while empty (drop target stays
+mounted), and Load example / Start over moved into a kebab.
+
+**Written summary (new)** — `buildSummary()` in `gaps.ts` generates HTML grouped by lane,
+rendered in a Tiptap editor (`SummaryEditor.tsx`). Generate fills it; once content exists
+only an explicit Regenerate overwrites, so edits are never lost to a board change. Saves
+to the doc as `summary`. Copy writes both `text/html` and `text/plain`. User input is
+escaped on the way into the generated HTML.
+
+**New dependency:** `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit` — first added to
+this tool. Markdown-in-a-textarea was tried first and rejected on sight.
+
+**Still open**
+
+- **"Steps with no connections"** sits with the findings, but a disconnected card mid-build
+  is usually just unfinished. Probably belongs under "Not filled in yet".
+- **"Change diagram" button** should move into the shared Opsette app header. Not done —
+  that component is shared across all sixteen tools and deserves its own session.
+- **Sticky Build/Diagram toggle** — would save real scrolling during a live session.
+- The 375px pass still hasn't happened.

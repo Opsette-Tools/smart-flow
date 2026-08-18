@@ -17,9 +17,10 @@ interface Props {
   allItems: Item[];
   lanes: Lane[];
   dispatch: Dispatch<Action>;
+  discovery?: boolean;
 }
 
-export function LaneColumn({ lane, items, allItems, lanes, dispatch }: Props) {
+export function LaneColumn({ lane, items, allItems, lanes, dispatch, discovery = false }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: laneScopeId(lane.id) });
   const [paste, setPaste] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -55,6 +56,7 @@ export function LaneColumn({ lane, items, allItems, lanes, dispatch }: Props) {
                 allItems={allItems}
                 lanes={lanes}
                 dispatch={dispatch}
+                discovery={discovery}
               />
             ))}
           </SortableContext>

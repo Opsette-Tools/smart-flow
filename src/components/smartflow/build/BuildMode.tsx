@@ -1,6 +1,12 @@
 import { useMemo, useState, type Dispatch } from "react";
-import { Button, Empty, Modal, Space, Typography } from "antd";
-import { ArrowRightOutlined, ClearOutlined, BulbOutlined } from "@ant-design/icons";
+import { Button, Dropdown, Empty, Modal, Switch, Tooltip, Typography } from "antd";
+import {
+  ArrowRightOutlined,
+  ClearOutlined,
+  BulbOutlined,
+  SearchOutlined,
+  MoreOutlined,
+} from "@ant-design/icons";
 import {
   DndContext,
   DragOverlay,
@@ -122,6 +128,7 @@ export function BuildMode({ doc, dispatch, onViewDiagram }: Props) {
     }
   };
 
+  const discovery = doc.discovery === true;
   const hasLanes = lanes.length > 0;
   const hasAnyItem = doc.items.length > 0;
   const hasAnything = hasLanes || hasAnyItem;
@@ -165,22 +172,43 @@ export function BuildMode({ doc, dispatch, onViewDiagram }: Props) {
       onDragCancel={() => setActiveId(null)}
     >
       <div className="sf-stack">
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <Space size={4}>
-            <Button type="text" size="small" icon={<BulbOutlined />} onClick={handleLoadExample}>
-              Load example
-            </Button>
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<ClearOutlined />}
-              onClick={handleStartOver}
-              disabled={!hasAnything}
-            >
-              Start over
-            </Button>
-          </Space>
+        {/* Discovery on the left, everything else folded into one kebab. The
+            two used to be a full row of buttons; a row of buttons is exactly
+            what this header did not need more of. */}
+        <div className="sf-build-actions">
+          <Tooltip title="Adds a handoff method, a storage system, and an open question to every step.">
+            <label className="sf-discovery-toggle">
+              <SearchOutlined />
+              <span>Discovery mode</span>
+              <Switch
+                size="small"
+                checked={discovery}
+                onChange={(on) => {
+                  dispatch({ type: "SET_DISCOVERY", on });
+                  haptic("tap");
+                }}
+              />
+            </label>
+          </Tooltip>
+          <Dropdown
+            trigger={["click"]}
+            placement="bottomRight"
+            menu={{
+              items: [
+                { key: "example", icon: <BulbOutlined />, label: "Load example" },
+                {
+                  key: "reset",
+                  icon: <ClearOutlined />,
+                  label: "Start over",
+                  danger: true,
+                  disabled: !hasAnything,
+                },
+              ],
+              onClick: ({ key }) => (key === "example" ? handleLoadExample() : handleStartOver()),
+            }}
+          >
+            <Button type="text" size="small" icon={<MoreOutlined />} aria-label="Board actions" />
+          </Dropdown>
         </div>
 
         <LaneManager lanes={lanes} dispatch={dispatch} />
@@ -206,6 +234,7 @@ export function BuildMode({ doc, dispatch, onViewDiagram }: Props) {
                     allItems={doc.items}
                     lanes={lanes}
                     dispatch={dispatch}
+                    discovery={discovery}
                   />
                 ))}
               </div>

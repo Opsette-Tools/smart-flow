@@ -9,7 +9,7 @@
  */
 
 import { MarkerType, type Edge, type Node } from "reactflow";
-import type { SmartFlowDoc } from "../types";
+import { isManualMechanism, mechanismLabel, type HandoffMechanism, type SmartFlowDoc } from "../types";
 
 // Layout constants — one place to tune the diagram's geometry.
 export const LANE_WIDTH = 240;
@@ -29,7 +29,29 @@ export interface LayoutResult {
   height: number;
 }
 
-export function buildLayout(doc: SmartFlowDoc, isDark: boolean): LayoutResult {
+/**
+ * Edge color by mechanism. The manual end of the ladder reads warm (a finding),
+ * the automated end reads neutral (fine as-is) — so a discovery diagram is a
+ * gap map at a glance: the warm arrows ARE the pitch. An arrow nobody has been
+ * asked about keeps the default color; "not asked yet" is not a finding.
+ */
+function edgeColorFor(
+  mechanism: HandoffMechanism | undefined,
+  isDark: boolean,
+  fallback: string,
+): string {
+  if (mechanism === undefined) return fallback;
+  // Warm = manual (a finding). Muted sage = system or automated (fine as-is).
+  if (isManualMechanism(mechanism)) return isDark ? "#d98c5f" : "#b4653a";
+  return "#7f9b90";
+}
+
+export function buildLayout(
+  doc: SmartFlowDoc,
+  isDark: boolean,
+  /** Discovery mode: label + color the edges, and flag steps with a question. */
+  annotate = false,
+): LayoutResult {
   const lanes = [...doc.lanes].sort((a, b) => a.order - b.order);
 
   // Items grouped by lane, ordered. Inbox items are NOT rendered (they aren't
@@ -74,7 +96,10 @@ export function buildLayout(doc: SmartFlowDoc, isDark: boolean): LayoutResult {
         id: item.id,
         type: "itemNode",
         position: { x, y },
-        data: { label: item.label },
+        data: {
+          label: item.label,
+          flagged: annotate && Boolean(item.openQuestion?.trim()),
+        },
         draggable: false,
         selectable: false,
         width: LANE_WIDTH - ITEM_INSET_X * 2,
@@ -93,11 +118,24 @@ export function buildLayout(doc: SmartFlowDoc, isDark: boolean): LayoutResult {
   const edges: Edge[] = [];
   for (const item of doc.items) {
     if (!placed.has(item.id)) continue;
+    const detail = new Map((item.connections ?? []).map((c) => [c.toId, c] as const));
     for (const targetId of item.connectsTo) {
       if (!placed.has(targetId)) continue;
       const sameColumn = itemX.get(item.id) === itemX.get(targetId);
       const downward = (itemY.get(targetId) ?? 0) > (itemY.get(item.id) ?? 0);
       const vertical = sameColumn && downward;
+
+      const conn = annotate ? detail.get(targetId) : undefined;
+      const stroke = annotate ? edgeColorFor(conn?.mechanism, isDark, edgeColor) : edgeColor;
+      // "Existing system" carries its name — the name is the finding, not the
+      // category, so show "QuickBooks" rather than the generic word.
+      const label =
+        conn?.mechanism === undefined
+          ? undefined
+          : conn.mechanism === "system" && conn.systemName
+            ? conn.systemName
+            : mechanismLabel(conn.mechanism);
+
       edges.push({
         id: `e:${item.id}->${targetId}`,
         source: item.id,
@@ -106,8 +144,14 @@ export function buildLayout(doc: SmartFlowDoc, isDark: boolean): LayoutResult {
         targetHandle: vertical ? "t-top" : "t-left",
         type: "smoothstep",
         animated: false,
-        style: { stroke: edgeColor, strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 18, height: 18 },
+        label,
+        labelShowBg: true,
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 4,
+        labelBgStyle: { fill: isDark ? "#1d1d1d" : "#ffffff", fillOpacity: 0.92 },
+        labelStyle: { fill: stroke, fontSize: 11, fontWeight: 600 },
+        style: { stroke, strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: stroke, width: 18, height: 18 },
       });
     }
   }

@@ -54,11 +54,15 @@ const wrapLabel: React.CSSProperties = {
   lineHeight: 1.25,
 };
 
-export function ItemNode({ data }: NodeProps<{ label: string }>) {
+export function ItemNode({ data }: NodeProps<{ label: string; flagged?: boolean }>) {
   return (
-    <div className="sf-rf-item">
+    <div className={`sf-rf-item${data.flagged ? " sf-rf-flagged" : ""}`}>
       <Anchors />
       <span style={wrapLabel}>{data.label}</span>
+      {/* Discovery: this step has an unanswered question on it. A corner mark
+          rather than the text itself — the question can be a full sentence and
+          would blow out the card. */}
+      {data.flagged && <span className="sf-rf-flag" aria-hidden="true" />}
     </div>
   );
 }

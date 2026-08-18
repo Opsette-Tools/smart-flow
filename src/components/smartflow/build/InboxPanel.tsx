@@ -1,6 +1,6 @@
 import { useState, type Dispatch } from "react";
 import { Button, Card, Input, Select, Typography } from "antd";
-import { PlusOutlined, HolderOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, HolderOutlined, DeleteOutlined, DownOutlined, RightOutlined } from "@ant-design/icons";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -62,7 +62,11 @@ function InboxItemRow({
 
 export function InboxPanel({ items, lanes, dispatch }: Props) {
   const [draft, setDraft] = useState("");
+  // Collapsed while empty: an empty inbox was holding ~200px of the screen to
+  // say nothing. It opens on click, and whenever it actually holds steps.
+  const [open, setOpen] = useState(items.length > 0);
   const { setNodeRef, isOver } = useDroppable({ id: INBOX_SCOPE });
+  const expanded = open || items.length > 0;
 
   const addFromTextarea = () => {
     const labels = draft.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -78,11 +82,27 @@ export function InboxPanel({ items, lanes, dispatch }: Props) {
       styles={{ body: { padding: 16 } }}
       style={isOver ? { outline: "2px solid var(--ops-green-light)", outlineOffset: -1 } : undefined}
     >
-      <div className="sf-section-head" style={{ marginBottom: 8 }}>
-        <h2 className="sf-section-title">Inbox</h2>
-        <Text className="sf-section-hint">Paste your steps, one per line — assign each to a lane</Text>
+      <div className="sf-section-head" style={{ marginBottom: expanded ? 8 : 0 }}>
+        <button
+          type="button"
+          className="sf-inbox-toggle"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={expanded}
+        >
+          {expanded ? <DownOutlined /> : <RightOutlined />}
+          <h2 className="sf-section-title">Inbox</h2>
+          <span className="sf-inbox-state">
+            {items.length > 0 ? `${items.length} unsorted` : "empty"}
+          </span>
+        </button>
+        {expanded && (
+          <Text className="sf-section-hint">
+            Paste your steps, one per line — assign each to a lane
+          </Text>
+        )}
       </div>
 
+      {expanded && (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: items.length ? 16 : 0 }}>
         <TextArea
           placeholder={"Lead intake\nQualify\nNegotiation\nScope & bid"}
@@ -101,7 +121,10 @@ export function InboxPanel({ items, lanes, dispatch }: Props) {
           </Button>
         </div>
       </div>
+      )}
 
+      {/* The droppable stays mounted even when collapsed, so an item can still
+          be dragged back to the inbox without expanding it first. */}
       <div ref={setNodeRef}>
         {items.length > 0 ? (
           <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
@@ -111,11 +134,11 @@ export function InboxPanel({ items, lanes, dispatch }: Props) {
               ))}
             </div>
           </SortableContext>
-        ) : (
+        ) : expanded ? (
           <Text type="secondary" style={{ fontSize: "var(--ops-fs-fine)" }}>
             Unsorted steps land here. Empty inbox means everything is placed.
           </Text>
-        )}
+        ) : null}
       </div>
     </Card>
   );

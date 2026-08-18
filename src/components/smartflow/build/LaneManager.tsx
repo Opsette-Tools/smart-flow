@@ -149,26 +149,26 @@ export function LaneManager({ lanes, dispatch }: Props) {
   };
 
   return (
-    <section>
-      <div className="sf-section-head">
-        <h2 className="sf-section-title">Lanes</h2>
-        <Text className="sf-section-hint">Columns in your diagram, left to right</Text>
-      </div>
+    // One row: heading, add field, then the chips flowing after it. The old
+    // layout spent three stacked rows (heading + hint, input, chips) on this.
+    <section className="sf-lanes-bar">
+      <h2 className="sf-section-title sf-lanes-bar-title">Lanes</h2>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: lanes.length ? 16 : 0, maxWidth: 460 }}>
+      <div className="sf-lanes-bar-add">
         <Input
-          placeholder="Lane name (e.g. Sales) — comma-separate to add several"
+          size="small"
+          placeholder="Add a lane — comma-separate for several"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={onAddKey}
           allowClear
         />
-        <Button type="primary" icon={<PlusOutlined />} onClick={addLanes}>
+        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={addLanes}>
           Add
         </Button>
       </div>
 
-      {lanes.length > 0 && (
+      {lanes.length > 0 ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={lanes.map((l) => l.id)} strategy={horizontalListSortingStrategy}>
             <div className="sf-lane-chips">
@@ -178,6 +178,8 @@ export function LaneManager({ lanes, dispatch }: Props) {
             </div>
           </SortableContext>
         </DndContext>
+      ) : (
+        <Text className="sf-section-hint">Columns in your diagram, left to right</Text>
       )}
     </section>
   );

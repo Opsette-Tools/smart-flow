@@ -11,7 +11,7 @@
  * the diagram layout deterministic.
  */
 
-import type { Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
+import type { Connection, HandoffMechanism, Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
 import { uuid } from "@/lib/uuid";
 import { leadToClientDoc } from "./templates";
 
@@ -43,13 +43,20 @@ export function loadDoc(): SmartFlowDoc | null {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedDoc>;
-    if (parsed?.v !== 1 || !parsed.doc) return null;
+    if ((parsed?.v !== 1 && parsed?.v !== 2) || !parsed.doc) return null;
     const doc = parsed.doc;
     if (!Array.isArray(doc.lanes) || !Array.isArray(doc.items)) return null;
-    // Defensive: ensure connectsTo is always an array on every item.
+    // v1 -> v2 is a no-op read: every discovery field is optional, so a v1 doc
+    // loads untouched. All this does is re-assert the invariants.
     return {
       lanes: doc.lanes,
-      items: doc.items.map((i) => ({ ...i, connectsTo: Array.isArray(i.connectsTo) ? i.connectsTo : [] })),
+      items: doc.items.map((i) => ({
+        ...i,
+        connectsTo: Array.isArray(i.connectsTo) ? i.connectsTo : [],
+        connections: Array.isArray(i.connections) ? i.connections : undefined,
+      })),
+      discovery: doc.discovery === true,
+      summary: typeof doc.summary === "string" ? doc.summary : undefined,
     };
   } catch {
     return null;
@@ -60,7 +67,7 @@ export function loadDoc(): SmartFlowDoc | null {
 export function saveDoc(doc: SmartFlowDoc): void {
   if (typeof window === "undefined") return;
   try {
-    const payload: PersistedDoc = { v: 1, doc };
+    const payload: PersistedDoc = { v: 2, doc };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     /* storage full or unavailable — non-fatal */
@@ -112,13 +119,49 @@ function renormalizeAll(doc: SmartFlowDoc): SmartFlowDoc {
   return { lanes: renormalizeLanes(doc.lanes), items };
 }
 
-/** Strip a list of item IDs out of every other item's connectsTo. */
+/** Strip a list of item IDs out of every other item's connectsTo, and out of
+ *  the `connections` sidecar so no orphan detail survives a deleted step. */
 function pruneConnections(items: Item[], removedIds: Set<string>): Item[] {
-  return items.map((i) =>
-    i.connectsTo.some((id) => removedIds.has(id))
-      ? { ...i, connectsTo: i.connectsTo.filter((id) => !removedIds.has(id)) }
-      : i,
-  );
+  return items.map((i) => {
+    const hitsEdge = i.connectsTo.some((id) => removedIds.has(id));
+    const hitsDetail = i.connections?.some((c) => removedIds.has(c.toId)) ?? false;
+    if (!hitsEdge && !hitsDetail) return i;
+    return {
+      ...i,
+      connectsTo: i.connectsTo.filter((id) => !removedIds.has(id)),
+      connections: dropEmpty(i.connections?.filter((c) => !removedIds.has(c.toId))),
+    };
+  });
+}
+
+/** An empty sidecar is stored as undefined, never [] — "no detail" and "not
+ *  asked yet" are the same state, and one representation keeps them that way. */
+function dropEmpty(list: Connection[] | undefined): Connection[] | undefined {
+  return list && list.length > 0 ? list : undefined;
+}
+
+/** Merge a patch into the sidecar entry for one target, creating it if absent.
+ *  An entry that ends up carrying no information is removed entirely. */
+function upsertConnection(
+  item: Item,
+  toId: string,
+  patch: Partial<Omit<Connection, "toId">>,
+): Item {
+  const existing = item.connections ?? [];
+  const found = existing.find((c) => c.toId === toId);
+  const merged: Connection = { ...(found ?? { toId }), ...patch };
+  // Clearing the mechanism clears the system name with it — a bare name with
+  // no mechanism is meaningless and would linger invisibly.
+  if (merged.mechanism === undefined) delete merged.systemName;
+  if (merged.mechanism !== "system") delete merged.systemName;
+
+  const isEmpty = merged.mechanism === undefined && !merged.systemName;
+  const next = isEmpty
+    ? existing.filter((c) => c.toId !== toId)
+    : found
+      ? existing.map((c) => (c.toId === toId ? merged : c))
+      : [...existing, merged];
+  return { ...item, connections: dropEmpty(next) };
 }
 
 function maxOrderInScope(items: Item[], laneId: string | null): number {
@@ -146,6 +189,13 @@ export type Action =
   // Reorder items within one scope to the given id sequence.
   | { type: "REORDER_ITEMS"; laneId: string | null; orderedIds: string[] }
   | { type: "SET_CONNECTIONS"; id: string; connectsTo: string[] }
+  // --- Discovery layer ---
+  | { type: "SET_DISCOVERY"; on: boolean }
+  | { type: "SET_SUMMARY"; text: string }
+  | { type: "SET_MECHANISM"; id: string; toId: string; mechanism?: HandoffMechanism }
+  | { type: "SET_SYSTEM_NAME"; id: string; toId: string; systemName: string }
+  | { type: "SET_SYSTEM_OF_RECORD"; id: string; systemOfRecord: string }
+  | { type: "SET_OPEN_QUESTION"; id: string; openQuestion: string }
   | { type: "RESET" }
   | { type: "REPLACE_DOC"; doc: SmartFlowDoc };
 
@@ -276,14 +326,79 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
       const cleaned = Array.from(new Set(action.connectsTo)).filter(
         (id) => id !== action.id && valid.has(id),
       );
+      // Removing an arrow removes its discovery detail with it — a mechanism
+      // for an edge that no longer exists would sit invisible in the gaps count.
+      const keep = new Set(cleaned);
       return {
         ...doc,
-        items: doc.items.map((i) => (i.id === action.id ? { ...i, connectsTo: cleaned } : i)),
+        items: doc.items.map((i) =>
+          i.id === action.id
+            ? {
+                ...i,
+                connectsTo: cleaned,
+                connections: dropEmpty(i.connections?.filter((c) => keep.has(c.toId))),
+              }
+            : i,
+        ),
+      };
+    }
+
+    case "SET_DISCOVERY":
+      return { ...doc, discovery: action.on };
+
+    case "SET_SUMMARY":
+      return { ...doc, summary: action.text || undefined };
+
+    case "SET_MECHANISM": {
+      // Only annotate an arrow that actually exists.
+      const source = doc.items.find((i) => i.id === action.id);
+      if (!source || !source.connectsTo.includes(action.toId)) return doc;
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id ? upsertConnection(i, action.toId, { mechanism: action.mechanism }) : i,
+        ),
+      };
+    }
+
+    case "SET_SYSTEM_NAME": {
+      const source = doc.items.find((i) => i.id === action.id);
+      if (!source || !source.connectsTo.includes(action.toId)) return doc;
+      const name = action.systemName.trim();
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id
+            ? upsertConnection(i, action.toId, { systemName: name || undefined })
+            : i,
+        ),
+      };
+    }
+
+    case "SET_SYSTEM_OF_RECORD": {
+      const value = action.systemOfRecord.trim();
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id ? { ...i, systemOfRecord: value || undefined } : i,
+        ),
+      };
+    }
+
+    case "SET_OPEN_QUESTION": {
+      const value = action.openQuestion.trim();
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id ? { ...i, openQuestion: value || undefined } : i,
+        ),
       };
     }
 
     case "RESET":
-      return emptyDoc;
+      // Start over clears content, not the mode. Wiping the board mid-interview
+      // shouldn't silently drop you out of discovery.
+      return { ...emptyDoc, discovery: doc.discovery };
 
     case "REPLACE_DOC":
       return action.doc;

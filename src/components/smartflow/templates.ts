@@ -68,6 +68,17 @@ interface SwimStep {
   lane: string;
   /** Local keys of the steps this one connects to. */
   to?: string[];
+  /** Discovery seed: where this step's data lives. Omit to leave it blank —
+   *  a discovery template is supposed to arrive with holes in it. */
+  systemOfRecord?: string;
+  /** Discovery seed: a question the template plants for you to ask. */
+  openQuestion?: string;
+}
+
+/** Optional doc-level settings for a swimlane spec. */
+interface SwimOptions {
+  /** Open the doc straight into discovery mode. */
+  discovery?: boolean;
 }
 
 /**
@@ -76,7 +87,11 @@ interface SwimStep {
  * lane; `to` keys are resolved to fresh uuids. Fresh ids every call so loading
  * a template twice never collides.
  */
-export function buildSwimDoc(laneNames: string[], steps: SwimStep[]): SmartFlowDoc {
+export function buildSwimDoc(
+  laneNames: string[],
+  steps: SwimStep[],
+  options: SwimOptions = {},
+): SmartFlowDoc {
   const laneId = new Map<string, string>();
   const lanes: Lane[] = laneNames.map((name, order) => {
     const id = uuid();
@@ -99,10 +114,12 @@ export function buildSwimDoc(laneNames: string[], steps: SwimStep[]): SmartFlowD
       laneId: laneId.get(s.lane) ?? null,
       order: next,
       connectsTo: (s.to ?? []).map((k) => stepId.get(k)!).filter(Boolean),
+      systemOfRecord: s.systemOfRecord,
+      openQuestion: s.openQuestion,
     };
   });
 
-  return { lanes, items };
+  return options.discovery ? { lanes, items, discovery: true } : { lanes, items };
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +158,147 @@ export function contentPipelineDoc(): SmartFlowDoc {
       { key: "schedule", label: "Schedule post", lane: "Publish", to: ["promote"] },
       { key: "promote", label: "Publish & promote", lane: "Publish" },
     ],
+  );
+}
+
+/**
+ * Contract manufacturer — department discovery.
+ *
+ * This one is deliberately INCOMPLETE, and that is the design. A template that
+ * arrives already correct teaches the wrong thing: the point is to fill it in
+ * with the client, and to find that some of these lanes do not exist there and
+ * others are one overloaded person.
+ *
+ * Domain notes carried from the plan, do not "tidy" these away:
+ *  - Quality is seeded as TWO lanes. QA owns the system and the documentation;
+ *    QC runs the tests. They are frequently different people with different
+ *    handoffs, and merging them bakes in an error before the interview starts.
+ *  - Regulatory gets its own lane even though it is often missing from the org
+ *    chart — at most contract manufacturers it is somebody's second job.
+ *    Finding out whose is one of the highest-value moments in the meeting.
+ *  - Only a couple of steps carry a system of record, and no handoff carries a
+ *    mechanism. Those blanks are the interview.
+ */
+export function cmDiscoveryDoc(): SmartFlowDoc {
+  return buildSwimDoc(
+    [
+      "Sales",
+      "Product Development",
+      "Regulatory",
+      "Procurement",
+      "Production Planning",
+      "Manufacturing",
+      "QA",
+      "QC",
+      "Warehouse & Shipping",
+      "Finance",
+    ],
+    [
+      // Sales
+      {
+        key: "inquiry",
+        label: "Customer inquiry / RFP",
+        lane: "Sales",
+        to: ["feasibility"],
+        openQuestion: "Where do inquiries actually land — one inbox, or whoever gets the call?",
+      },
+      {
+        key: "quote",
+        label: "Quote & pricing",
+        lane: "Sales",
+        to: ["po"],
+        openQuestion: "Who signs off on price, and what happens when the customer negotiates?",
+      },
+      { key: "po", label: "Customer PO received", lane: "Sales", to: ["schedule", "invoice"] },
+
+      // Product Development
+      {
+        key: "feasibility",
+        label: "Feasibility review",
+        lane: "Product Development",
+        to: ["formula", "regreview"],
+      },
+      { key: "formula", label: "Formula / spec development", lane: "Product Development", to: ["sample"] },
+      {
+        key: "sample",
+        label: "Sample or pilot batch",
+        lane: "Product Development",
+        to: ["quote"],
+        openQuestion: "Does the customer pay for samples, and who tracks how many we have sent?",
+      },
+
+      // Regulatory — the lane most often missing from the org chart.
+      {
+        key: "regreview",
+        label: "Regulatory review",
+        lane: "Regulatory",
+        openQuestion: "Whose actual job is this? Is it anyone's full-time role?",
+      },
+      {
+        key: "labelreview",
+        label: "Label & claims review",
+        lane: "Regulatory",
+        openQuestion: "Who has final say on a claim — us or the customer?",
+      },
+
+      // Procurement
+      {
+        key: "sourcing",
+        label: "Source raw materials",
+        lane: "Procurement",
+        to: ["receive"],
+        openQuestion: "How do you know what to order — a system, or someone checking shelves?",
+      },
+      { key: "receive", label: "Receive & log materials", lane: "Procurement", to: ["incoming"] },
+
+      // Production Planning
+      { key: "schedule", label: "Schedule the run", lane: "Production Planning", to: ["sourcing", "produce"] },
+      {
+        key: "capacity",
+        label: "Capacity check",
+        lane: "Production Planning",
+        openQuestion: "Is this a real step or does scheduling just absorb it?",
+      },
+
+      // Manufacturing
+      { key: "produce", label: "Production run", lane: "Manufacturing", to: ["inprocess"] },
+      { key: "package", label: "Packaging & labeling", lane: "Manufacturing", to: ["finished"] },
+
+      // QA — owns the system and the paperwork.
+      {
+        key: "batchrec",
+        label: "Batch record review",
+        lane: "QA",
+        to: ["release"],
+        openQuestion: "Paper batch records or electronic? Who reviews, and how long does it sit?",
+      },
+      { key: "release", label: "Release decision", lane: "QA", to: ["ship"] },
+      {
+        key: "deviation",
+        label: "Deviation / CAPA",
+        lane: "QA",
+        openQuestion: "What actually triggers a deviation, and where does it get written down?",
+      },
+
+      // QC — runs the tests. Separate people, separate handoffs.
+      { key: "incoming", label: "Incoming material testing", lane: "QC", to: ["produce"] },
+      { key: "inprocess", label: "In-process testing", lane: "QC", to: ["package"] },
+      { key: "finished", label: "Finished product testing", lane: "QC", to: ["batchrec"] },
+
+      // Warehouse & Shipping
+      { key: "ship", label: "Pick, pack & ship", lane: "Warehouse & Shipping", to: ["invoice"] },
+      {
+        key: "inventory",
+        label: "Inventory counts",
+        lane: "Warehouse & Shipping",
+        openQuestion: "Cycle counts or an annual scramble? What is the count reconciled against?",
+      },
+
+      // Finance
+      { key: "invoice", label: "Invoice the customer", lane: "Finance", to: ["payment"] },
+      { key: "payment", label: "Payment received & applied", lane: "Finance" },
+    ],
+    { discovery: true },
   );
 }
 
@@ -305,6 +463,16 @@ const SIMPLE_ORG_CHART = `Owner
 
 export const TEMPLATES: Template[] = [
   // Contract manufacturing
+  {
+    id: "cm-department-discovery",
+    name: "Contract manufacturer — department discovery",
+    category: "Contract manufacturing",
+    type: "swimlane",
+    blurb:
+      "An interview scaffold for a first process-discovery meeting. Ships deliberately incomplete — the blanks are the agenda.",
+    makeDoc: cmDiscoveryDoc,
+  },
+
   {
     id: "cm-supplement-intake",
     name: "Supplement maker — RFP to award",

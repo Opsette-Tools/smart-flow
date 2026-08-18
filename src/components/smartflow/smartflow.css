@@ -26,7 +26,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ops-space-md);
-  margin-bottom: var(--ops-space-xl);
+  margin-bottom: var(--ops-space-md);
   flex-wrap: wrap;
 }
 .sf-topbar-which {
@@ -222,7 +222,7 @@ html.dark .sf-section-hint {
 .sf-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--ops-grid-gap);
+  gap: var(--ops-space-lg);
 }
 
 /* ---- Lane manager (chips) ------------------------------------------------ */
@@ -561,4 +561,414 @@ html.dark .sf-rf-endpoint {
   .sf-inbox-assign {
     width: 140px;
   }
+}
+
+/* ---- Discovery layer ---------------------------------------------------- */
+/* The annotation layer that turns a drawing into an interview instrument.
+   Everything here is gated behind discovery mode, so a first-time user drawing
+   a plain swimlane never meets any of it. */
+
+.sf-build-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-sm);
+  flex-wrap: wrap;
+}
+
+.sf-discovery-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ops-fs-fine);
+  color: #6b6b6b;
+  cursor: pointer;
+  user-select: none;
+}
+html.dark .sf-discovery-toggle {
+  color: #b9b7ae;
+}
+
+/* Per-connection mechanism rows, under the "Leads to" select. */
+.sf-mech-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--sf-border, #e8e8e8);
+}
+html.dark .sf-mech-list {
+  --sf-border: #3a3a38;
+}
+.sf-mech-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sf-mech-target {
+  font-size: var(--ops-fs-fine);
+  color: #8a8a8a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html.dark .sf-mech-target {
+  color: #9d9b93;
+}
+.sf-mech-select,
+.sf-mech-system {
+  width: 100%;
+}
+
+/* Details disclosure: system of record + open question. */
+.sf-card-details {
+  /* The card itself has no left padding — each child clears the 28px drag grip
+     on its own (see .sf-card-connect / .sf-conn-row). The rule keeps the dashed
+     divider full-bleed while the fields stay aligned with everything above. */
+  margin: 8px 0 0 28px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--sf-border, #e8e8e8);
+}
+html.dark .sf-card-details {
+  --sf-border: #3a3a38;
+}
+.sf-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--ops-fs-fine);
+  color: #6b6b6b;
+  /* Comfortable touch target without making the card taller than the text. */
+  min-height: 32px;
+}
+html.dark .sf-details-toggle {
+  color: #b9b7ae;
+}
+.sf-details-toggle:hover {
+  color: var(--ops-green-light);
+}
+html.dark .sf-details-toggle:hover {
+  color: var(--ops-gold);
+}
+/* Marks a collapsed Details that has something in it. */
+.sf-details-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ops-gold);
+}
+.sf-details-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+  padding-bottom: 2px;
+}
+.sf-details-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sf-details-label {
+  font-size: var(--ops-fs-fine);
+  color: #8a8a8a;
+}
+html.dark .sf-details-label {
+  color: #9d9b93;
+}
+
+/* Open-question flag on the card header. */
+.sf-card-flag {
+  flex: 0 0 auto;
+  color: var(--ops-gold);
+  font-size: 14px;
+}
+
+/* Diagram: a step carrying an unanswered question. */
+.sf-rf-flagged {
+  border-color: var(--ops-gold);
+}
+.sf-rf-flag {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ops-gold);
+  box-shadow: 0 0 0 2px #fff;
+}
+html.dark .sf-rf-flag {
+  box-shadow: 0 0 0 2px #141414;
+}
+/* The marker is absolutely positioned against the card. */
+.sf-rf-item {
+  position: relative;
+}
+
+/* ---- Gaps panel --------------------------------------------------------- */
+.sf-gaps {
+  margin-top: var(--ops-space-xl);
+}
+.sf-gaps-collapse {
+  background: transparent;
+}
+.sf-gap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-sm);
+  width: 100%;
+  font-size: var(--ops-fs-caption);
+  font-weight: 600;
+}
+.sf-gap-count {
+  margin-inline-end: 0;
+  flex: 0 0 auto;
+}
+.sf-gap-intro {
+  display: block;
+  font-size: var(--ops-fs-fine);
+  margin-bottom: var(--ops-space-sm);
+}
+.sf-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A finding reads as a sentence, with its context on a quieter second line. */
+.sf-finding {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sf-finding-say {
+  font-size: var(--ops-fs-caption);
+  line-height: 1.5;
+  color: #2a2a2a;
+}
+html.dark .sf-finding-say {
+  color: #e8e6df;
+}
+.sf-finding-why {
+  font-size: var(--ops-fs-fine);
+  line-height: 1.45;
+  color: #8a8a8a;
+}
+html.dark .sf-finding-why {
+  color: #9d9b93;
+}
+.sf-gap-note {
+  color: #8a8a8a;
+}
+html.dark .sf-gap-note {
+  color: #9d9b93;
+}
+.sf-gap-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+.sf-gap-group-name {
+  font-size: var(--ops-fs-fine);
+  font-weight: 600;
+  color: var(--ops-green-light);
+  margin-bottom: 4px;
+}
+html.dark .sf-gap-group-name {
+  color: var(--ops-gold);
+}
+
+/* Narrow viewports: the toggle row stacks so neither half gets squeezed, and
+   the gaps header keeps its count on the same line as the label. */
+@media (max-width: 575px) {
+  .sf-build-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--ops-space-md);
+  }
+  .sf-discovery-toggle {
+    justify-content: space-between;
+  }
+  .sf-gap-list li {
+    gap: 6px;
+  }
+}
+
+/* The to-do half: gaps in the interview, not in their process. Visually
+   separated so a blank form field is never mistaken for a client finding. */
+.sf-gaps-todo {
+  margin-top: var(--ops-space-xl);
+  padding-top: var(--ops-space-lg);
+  border-top: 1px dashed var(--sf-border, #e0e0e0);
+}
+html.dark .sf-gaps-todo {
+  --sf-border: #3a3a38;
+}
+.sf-gaps-todo-title {
+  font-size: var(--ops-fs-sub);
+}
+
+/* The label above a handoff-method select. A placeholder alone vanishes the
+   moment a value is picked, leaving an unnamed dropdown. */
+.sf-mech-label {
+  font-size: var(--ops-fs-fine);
+  color: #8a8a8a;
+}
+html.dark .sf-mech-label {
+  color: #9d9b93;
+}
+
+/* An unfilled discovery field. Soft amber — visible while scanning the board,
+   quiet enough that a half-built swimlane doesn't read as broken. */
+/* antd's own .ant-select-outlined .ant-select-selector outranks a single class,
+   so the select needs both its wrapper class AND the selector spelled out. */
+.sf-field-unfilled.ant-input,
+.ant-select.sf-field-unfilled .ant-select-selector,
+.ant-select-outlined.sf-field-unfilled:not(.ant-select-disabled):not(.ant-select-customize-input)
+  .ant-select-selector {
+  background: rgba(207, 174, 96, 0.16);
+  border-color: rgba(184, 148, 74, 0.75);
+}
+html.dark .sf-field-unfilled.ant-input,
+html.dark .ant-select.sf-field-unfilled .ant-select-selector,
+html.dark
+  .ant-select-outlined.sf-field-unfilled:not(.ant-select-disabled):not(.ant-select-customize-input)
+  .ant-select-selector {
+  background: rgba(207, 174, 96, 0.14);
+  border-color: rgba(207, 174, 96, 0.5);
+}
+
+/* ---- Condensed build header --------------------------------------------- */
+/* Lanes on one line: heading, add field, then chips flowing after it. */
+.sf-lanes-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-md);
+  flex-wrap: wrap;
+}
+.sf-lanes-bar-title {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.sf-lanes-bar-add {
+  display: flex;
+  gap: 6px;
+  flex: 0 1 300px;
+  min-width: 220px;
+}
+.sf-lanes-bar .sf-lane-chips {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+/* Inbox header doubles as its collapse control. */
+.sf-inbox-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+.sf-inbox-toggle .sf-section-title {
+  margin: 0;
+}
+.sf-inbox-state {
+  font-size: var(--ops-fs-fine);
+  color: #8a8a8a;
+}
+html.dark .sf-inbox-state {
+  color: #9d9b93;
+}
+
+/* The build action row sits with the topbar, not as a band of its own. */
+.sf-build-actions {
+  margin: 0;
+}
+
+/* ---- Written summary ---------------------------------------------------- */
+.sf-summary {
+  margin-top: var(--ops-space-xl);
+  padding-top: var(--ops-space-lg);
+  border-top: 1px dashed var(--sf-border, #e0e0e0);
+}
+html.dark .sf-summary {
+  --sf-border: #3a3a38;
+}
+.sf-summary-actions {
+  display: flex;
+  gap: var(--ops-space-sm);
+  flex-wrap: wrap;
+}
+/* Rich-text summary editor. Bordered like an antd input so it sits with the
+   rest of the form controls rather than looking like a foreign widget. */
+.sf-summary-shell {
+  margin-top: var(--ops-space-sm);
+  border: 1px solid var(--sf-border, #d9d9d9);
+  border-radius: var(--ops-radius);
+  background: var(--sf-card-bg, #fff);
+  overflow: hidden;
+}
+html.dark .sf-summary-shell {
+  --sf-border: #424242;
+  --sf-card-bg: #1d1d1d;
+}
+.sf-summary-shell:focus-within {
+  border-color: var(--ops-green-light);
+}
+html.dark .sf-summary-shell:focus-within {
+  border-color: var(--ops-gold);
+}
+.sf-summary-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--sf-border, #f0f0f0);
+  background: rgba(0, 0, 0, 0.015);
+}
+html.dark .sf-summary-toolbar {
+  background: rgba(255, 255, 255, 0.03);
+}
+.sf-summary-editor {
+  padding: 12px 14px;
+  min-height: 160px;
+  max-height: 420px;
+  overflow-y: auto;
+  font-size: var(--ops-fs-caption);
+  line-height: 1.6;
+  outline: none;
+}
+.sf-summary-editor p {
+  margin: 0 0 8px;
+}
+.sf-summary-editor ul,
+.sf-summary-editor ol {
+  margin: 0 0 12px;
+  padding-inline-start: 22px;
+}
+.sf-summary-editor li {
+  margin-bottom: 3px;
+}
+.sf-summary-editor > *:last-child {
+  margin-bottom: 0;
+}
+/* Placeholder for the empty document. */
+.sf-summary-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: #9a9a9a;
 }
