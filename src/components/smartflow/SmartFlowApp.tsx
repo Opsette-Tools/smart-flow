@@ -1,11 +1,12 @@
 import { useReducer, useEffect, useRef, useState } from "react";
-import { Button, Segmented, Typography, Modal } from "antd";
-import { AppstoreOutlined, PartitionOutlined, SwapOutlined } from "@ant-design/icons";
+import { Button, Segmented, Tooltip, Typography, Modal } from "antd";
+import { AppstoreOutlined, ApartmentOutlined, FileTextOutlined, SwapOutlined } from "@ant-design/icons";
 import { ThemeProvider } from "@/lib/theme";
 import Shell from "@/components/Shell";
 import { reducer, initDoc, saveDoc } from "./store";
 import { BuildMode } from "./build/BuildMode";
 import { DiagramView } from "./diagram/DiagramView";
+import { SchemaMapView } from "./schemamap/SchemaMapView";
 import { OutlineBuilder } from "./OutlineBuilder";
 import { ChooserModal } from "./ChooserModal";
 import { diagramInfo, type DiagramType } from "./diagramTypes";
@@ -19,7 +20,7 @@ import {
 import "./smartflow.css";
 
 const { Text } = Typography;
-type SwimMode = "build" | "diagram";
+type SwimMode = "build" | "diagram" | "map";
 type OutlineType = Exclude<DiagramType, "swimlane">;
 
 function SmartFlow() {
@@ -91,79 +92,87 @@ function SmartFlow() {
 
   const info = activeType ? diagramInfo(activeType) : null;
 
+  // "Change diagram" is app chrome, not a workspace control, so it belongs in
+  // the shared header rather than taking a row of the page.
+  const headerActions = activeType ? (
+    <Tooltip title="Change diagram">
+      <Button
+        size="small"
+        icon={<SwapOutlined />}
+        onClick={() => setChooserOpen(true)}
+        aria-label="Change diagram"
+      />
+    </Tooltip>
+  ) : undefined;
+
   return (
-    <main className="sf-main">
-      {/* Top bar: which diagram you're on + a way to switch types. */}
-      {activeType && (
-        <div className="sf-topbar">
-          <div className="sf-topbar-which">
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              You're building a
-            </Text>
-            <Text strong style={{ fontSize: 15 }}>
+    <Shell headerActions={headerActions}>
+      <main className="sf-main">
+        {/* One slim row: which diagram you're on, and the mode switch. The
+            switcher stays on the page because it moves you between workspaces
+            — the header holds chrome only. */}
+        {activeType && (
+          <div className="sf-topbar">
+            <Text type="secondary" className="sf-topbar-which">
               {info!.name}
             </Text>
-          </div>
-          <div className="sf-topbar-controls">
             {activeType === "swimlane" && (
               <Segmented<SwimMode>
                 value={swimMode}
                 onChange={setSwimMode}
                 options={[
                   { label: "Build", value: "build", icon: <AppstoreOutlined /> },
-                  { label: "Diagram", value: "diagram", icon: <PartitionOutlined /> },
+                  { label: "Summary", value: "diagram", icon: <FileTextOutlined /> },
+                  { label: "Map", value: "map", icon: <ApartmentOutlined /> },
                 ]}
               />
             )}
-            <Button icon={<SwapOutlined />} onClick={() => setChooserOpen(true)}>
-              Change diagram
+          </div>
+        )}
+
+        {/* Active diagram body. */}
+        {activeType === "swimlane" ? (
+          swimMode === "build" ? (
+            <BuildMode doc={doc} dispatch={dispatch} onViewDiagram={() => setSwimMode("diagram")} />
+          ) : swimMode === "map" ? (
+            <SchemaMapView doc={doc} dispatch={dispatch} />
+          ) : (
+            <DiagramView doc={doc} dispatch={dispatch} />
+          )
+        ) : activeType ? (
+          <OutlineBuilder
+            type={activeType}
+            text={outlineTexts[activeType as OutlineType] ?? ""}
+            onChange={(t) => setOutlineText(activeType as OutlineType, t)}
+          />
+        ) : (
+          // Chooser dismissed without picking. A real landing state, not a dead
+          // end — the header above it is reachable, so theme/share still work.
+          <div className="sf-empty-diagram" style={{ minHeight: "40vh" }}>
+            <Text type="secondary">
+              Nothing on the board yet. Pick the kind of diagram you need and we'll set it up.
+            </Text>
+            <Button type="primary" size="large" onClick={() => setChooserOpen(true)}>
+              Choose a diagram
             </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Active diagram body. */}
-      {activeType === "swimlane" ? (
-        swimMode === "build" ? (
-          <BuildMode doc={doc} dispatch={dispatch} onViewDiagram={() => setSwimMode("diagram")} />
-        ) : (
-          <DiagramView doc={doc} dispatch={dispatch} onBackToBuild={() => setSwimMode("build")} />
-        )
-      ) : activeType ? (
-        <OutlineBuilder
-          type={activeType}
-          text={outlineTexts[activeType as OutlineType] ?? ""}
-          onChange={(t) => setOutlineText(activeType as OutlineType, t)}
+        <ChooserModal
+          open={chooserOpen}
+          onPick={handlePick}
+          onPickTemplate={handlePickTemplate}
+          onClose={() => setChooserOpen(false)}
         />
-      ) : (
-        // Chooser dismissed without picking. A real landing state, not a dead
-        // end — the toolbar above it is reachable, so theme/share still work.
-        <div className="sf-empty-diagram" style={{ minHeight: "40vh" }}>
-          <Text type="secondary">
-            Nothing on the board yet. Pick the kind of diagram you need and we'll set it up.
-          </Text>
-          <Button type="primary" size="large" onClick={() => setChooserOpen(true)}>
-            Choose a diagram
-          </Button>
-        </div>
-      )}
-
-      <ChooserModal
-        open={chooserOpen}
-        onPick={handlePick}
-        onPickTemplate={handlePickTemplate}
-        onClose={() => setChooserOpen(false)}
-      />
-    </main>
+      </main>
+    </Shell>
   );
 }
 
 export function SmartFlowApp() {
   return (
     <ThemeProvider>
-      <Shell>
-        <SmartFlow />
-      </Shell>
+      <SmartFlow />
     </ThemeProvider>
   );
 }

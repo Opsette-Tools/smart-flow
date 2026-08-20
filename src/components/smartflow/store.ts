@@ -11,7 +11,7 @@
  * the diagram layout deterministic.
  */
 
-import type { Connection, HandoffMechanism, Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
+import type { CardPosition, Connection, HandoffMechanism, Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
 import { uuid } from "@/lib/uuid";
 import { leadToClientDoc } from "./templates";
 
@@ -36,6 +36,22 @@ export function seedDoc(): SmartFlowDoc {
 // localStorage
 // ---------------------------------------------------------------------------
 
+/** Validate persisted schema-map positions. A NaN or a non-numeric entry would
+ *  strand a card at an unreachable coordinate, so bad entries are dropped
+ *  rather than trusted — the card falls back to its computed grid slot. */
+function readPositions(raw: unknown): Record<string, CardPosition> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, CardPosition> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const { x, y } = value as { x?: unknown; y?: unknown };
+    if (typeof x !== "number" || typeof y !== "number") continue;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    out[key] = { x, y };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Read the saved doc. Returns null when nothing valid is stored. */
 export function loadDoc(): SmartFlowDoc | null {
   if (typeof window === "undefined") return null;
@@ -57,6 +73,7 @@ export function loadDoc(): SmartFlowDoc | null {
       })),
       discovery: doc.discovery === true,
       summary: typeof doc.summary === "string" ? doc.summary : undefined,
+      lanePositions: readPositions(doc.lanePositions),
     };
   } catch {
     return null;
@@ -116,7 +133,9 @@ function renormalizeAll(doc: SmartFlowDoc): SmartFlowDoc {
   let items = doc.items;
   const scopes: (string | null)[] = [null, ...doc.lanes.map((l) => l.id)];
   for (const scope of scopes) items = renormalizeItemsInScope(items, scope);
-  return { lanes: renormalizeLanes(doc.lanes), items };
+  // Spread the doc rather than rebuilding it: renormalizing is about `order`,
+  // and must not quietly drop discovery mode, the summary, or the map layout.
+  return { ...doc, lanes: renormalizeLanes(doc.lanes), items };
 }
 
 /** Strip a list of item IDs out of every other item's connectsTo, and out of
@@ -191,6 +210,10 @@ export type Action =
   | { type: "SET_CONNECTIONS"; id: string; connectsTo: string[] }
   // --- Discovery layer ---
   | { type: "SET_DISCOVERY"; on: boolean }
+  /** Schema map: remember where a lane card was dragged to. */
+  | { type: "SET_LANE_POSITION"; laneId: string; x: number; y: number }
+  /** Schema map: forget every hand-placement, back to the computed grid. */
+  | { type: "RESET_LANE_POSITIONS" }
   | { type: "SET_SUMMARY"; text: string }
   | { type: "SET_MECHANISM"; id: string; toId: string; mechanism?: HandoffMechanism }
   | { type: "SET_SYSTEM_NAME"; id: string; toId: string; systemName: string }
@@ -223,7 +246,14 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
         i.laneId === action.id ? { ...i, laneId: null, order: 0 } : i,
       );
       const lanes = doc.lanes.filter((l) => l.id !== action.id);
-      return renormalizeAll({ lanes, items });
+      // Drop the deleted lane's map placement too, so re-adding a lane with a
+      // recycled id can't inherit a stale position.
+      let lanePositions = doc.lanePositions;
+      if (lanePositions && action.id in lanePositions) {
+        const { [action.id]: _gone, ...rest } = lanePositions;
+        lanePositions = Object.keys(rest).length > 0 ? rest : undefined;
+      }
+      return renormalizeAll({ ...doc, lanes, items, lanePositions });
     }
 
     case "REORDER_LANES": {
@@ -393,6 +423,24 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
           i.id === action.id ? { ...i, openQuestion: value || undefined } : i,
         ),
       };
+    }
+
+    case "SET_LANE_POSITION": {
+      // Pixels only. `laneId` and `order` are untouched by dragging — the map
+      // is a view of the board, never an editor of it.
+      return {
+        ...doc,
+        lanePositions: {
+          ...doc.lanePositions,
+          [action.laneId]: { x: action.x, y: action.y },
+        },
+      };
+    }
+
+    case "RESET_LANE_POSITIONS": {
+      if (!doc.lanePositions) return doc;
+      const { lanePositions: _dropped, ...rest } = doc;
+      return rest;
     }
 
     case "RESET":

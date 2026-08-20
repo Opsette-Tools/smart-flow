@@ -10,7 +10,7 @@
      centered column. A high cap still protects ultra-wide monitors. */
   max-width: 1800px;
   margin: 0 auto;
-  padding: var(--ops-space-lg) clamp(12px, 2vw, 24px) calc(var(--ops-space-xl) * 2);
+  padding: 14px clamp(12px, 2vw, 24px) calc(var(--ops-space-xl) * 2);
 }
 
 /* Mode toggle row */
@@ -20,25 +20,38 @@
   margin-bottom: var(--ops-space-xl);
 }
 
-/* Top bar: which diagram + switch control */
+/* Top bar: one slim row. The mode switch is CENTERED — it's the control the
+   user reaches for most, and centering keeps it in the same place regardless
+   of how long the diagram name is. Three columns, with the name in the first
+   and an empty third of equal width, so the middle lands truly centered.
+   "Change diagram" lives in the shared header, not here. */
 .sf-topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: var(--ops-space-md);
-  margin-bottom: var(--ops-space-md);
-  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 .sf-topbar-which {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.sf-topbar-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--ops-space-sm);
-  flex-wrap: wrap;
+.sf-topbar > .ant-segmented {
+  grid-column: 2;
+  justify-self: center;
+}
+@media (max-width: 575px) {
+  /* Stack on a phone: the name above, the switch full-width under it, so the
+     three tabs stay comfortably tappable instead of squeezing. */
+  .sf-topbar {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 8px;
+  }
+  .sf-topbar > .ant-segmented {
+    grid-column: 1;
+  }
 }
 
 /* Chooser modal options */
@@ -464,25 +477,8 @@ html.dark .sf-diagram-frame {
   --sf-canvas: #0e0e0e;
 }
 
-/* React Flow custom nodes */
-.sf-rf-lane {
-  box-sizing: border-box;
-  border-radius: 10px;
-  border: 1px solid rgba(47, 79, 70, 0.18);
-  background: rgba(47, 79, 70, 0.04);
-}
-.sf-rf-lane-head {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #fff;
-  background: var(--ops-green);
-  border-radius: 10px 10px 0 0;
-  letter-spacing: 0.01em;
-}
+/* React Flow custom nodes (outline diagram types only — the swimlane has its
+   own canvas in ../schemamap and does not render through React Flow). */
 .sf-rf-item {
   box-sizing: border-box;
   width: 100%;
@@ -687,28 +683,6 @@ html.dark .sf-details-label {
   flex: 0 0 auto;
   color: var(--ops-gold);
   font-size: 14px;
-}
-
-/* Diagram: a step carrying an unanswered question. */
-.sf-rf-flagged {
-  border-color: var(--ops-gold);
-}
-.sf-rf-flag {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--ops-gold);
-  box-shadow: 0 0 0 2px #fff;
-}
-html.dark .sf-rf-flag {
-  box-shadow: 0 0 0 2px #141414;
-}
-/* The marker is absolutely positioned against the card. */
-.sf-rf-item {
-  position: relative;
 }
 
 /* ---- Gaps panel --------------------------------------------------------- */
@@ -971,4 +945,283 @@ html.dark .sf-summary-toolbar {
   height: 0;
   pointer-events: none;
   color: #9a9a9a;
+}
+
+/* ===================================================================
+   Schema map
+   A pan/zoom canvas of draggable lane cards. Deliberately quieter than
+   the swimlane's chrome: on this page the LINES carry the meaning, so
+   the cards stay near-monochrome and let color mean something.
+   =================================================================== */
+
+.sf-map-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+
+.sf-map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+  flex-wrap: wrap;
+}
+.sf-map-toolbar-left,
+.sf-map-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The canvas takes the room it needs — this page IS the map. */
+.sf-map-frame {
+  position: relative;
+  height: clamp(520px, 78vh, 1000px);
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  overflow: hidden;
+  background: var(--sf-canvas, #fafafa);
+  /* Dotted ground, so panning is legible as movement. */
+  background-image: radial-gradient(var(--sf-dot, #dedede) 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab;
+  /* Required for pointer-drag on touch: without it the browser claims the
+     gesture for scrolling and the card never moves. */
+  touch-action: none;
+  user-select: none;
+}
+html.dark .sf-map-frame {
+  --sf-border: #2a2a2a;
+  --sf-canvas: #0e0e0e;
+  --sf-dot: #232323;
+}
+
+.sf-map-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+/* No width/height and overflow visible: a card dragged to a negative
+   coordinate keeps its lines instead of having them clipped. */
+.sf-map-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sf-map-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ── Card ───────────────────────────────────────────────────────── */
+
+.sf-map-card {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--sf-map-border, #e0e0dd);
+  border-radius: 10px;
+  background: var(--sf-map-card-bg, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+  font-size: 12px;
+  transition: opacity 0.18s, border-color 0.18s, box-shadow 0.18s;
+}
+.sf-map-card.is-connected {
+  border-color: var(--sf-map-connected, #9db3ab);
+}
+.sf-map-card.is-focused {
+  border-color: var(--sf-map-focus, #2f4f46);
+  box-shadow: 0 6px 20px rgba(47, 79, 70, 0.22);
+}
+html.dark .sf-map-card {
+  --sf-map-border: #333331;
+  --sf-map-card-bg: #1b1b1a;
+  --sf-map-connected: #5c7a70;
+  --sf-map-focus: #8fb3a7;
+}
+
+.sf-map-card-head {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--sf-map-border, #ececea);
+  /* The lane's identity, as a color stripe. */
+  border-left: 4px solid transparent;
+  background: var(--sf-map-head-bg, #f7f7f5);
+  font-weight: 650;
+  font-size: 13px;
+  color: var(--sf-map-head-fg, #1a1a1a);
+  cursor: grab;
+}
+.sf-map-card-head:active {
+  cursor: grabbing;
+}
+html.dark .sf-map-card-head {
+  --sf-map-head-bg: #232322;
+  --sf-map-head-fg: #ededea;
+}
+.sf-map-card-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-map-card-count {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Rows ───────────────────────────────────────────────────────── */
+
+.sf-map-row {
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--sf-map-rowline, #f2f2f0);
+}
+.sf-map-row:last-child {
+  border-bottom: none;
+}
+html.dark .sf-map-row {
+  --sf-map-rowline: #262625;
+}
+
+.sf-map-step {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--sf-map-step-fg, #2a2a28);
+  font-weight: 500;
+}
+html.dark .sf-map-step {
+  --sf-map-step-fg: #dcdcd8;
+}
+.sf-map-step-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An unanswered question hangs off this step. */
+.sf-map-flag {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ops-gold, #c9a227);
+  flex-shrink: 0;
+}
+
+/* The handoff, nested under its step, in the client's own words. */
+.sf-map-note {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 22px;
+  font-size: 11px;
+  color: var(--sf-map-note-fg, #8a8a85);
+  line-height: 1;
+}
+html.dark .sf-map-note {
+  --sf-map-note-fg: #7d7d78;
+}
+.sf-map-note-target {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+.sf-map-note-method {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+/* Warm = a person carries it, matching the line color. */
+.sf-map-note.is-manual .sf-map-note-method {
+  color: var(--sf-map-warm, #b4653a);
+  opacity: 1;
+}
+html.dark .sf-map-note.is-manual .sf-map-note-method {
+  --sf-map-warm: #d98c5f;
+}
+.sf-map-note.is-system .sf-map-note-method {
+  font-style: italic;
+}
+.sf-map-note.is-question .sf-map-note-method {
+  color: var(--sf-map-q, #9a7d1f);
+}
+html.dark .sf-map-note.is-question .sf-map-note-method {
+  --sf-map-q: #c9a227;
+}
+
+.sf-map-row-empty {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--sf-map-note-fg, #a5a5a0);
+}
+
+@media (max-width: 575px) {
+  .sf-map-frame {
+    height: clamp(420px, 68vh, 720px);
+  }
+  .sf-map-toolbar-left,
+  .sf-map-toolbar-right {
+    width: 100%;
+  }
+  .sf-map-toolbar-right {
+    justify-content: flex-end;
+  }
+}
+
+
+/* ===================================================================
+   Findings page (formerly the diagram page)
+   No canvas here any more — the Map draws the process. This page is
+   the written read-out, so it's laid out as a document.
+   =================================================================== */
+
+.sf-findings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+.sf-findings-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ops-space-sm);
+  flex-wrap: wrap;
+}
+/* A document, so it sits as one: a capped measure centered in the page.
+   Long finding lists stay readable instead of running the full width of a
+   wide monitor. The toolbar is capped to match so its button lines up with
+   the right edge of the text rather than floating off past it. */
+.sf-findings-body,
+.sf-findings-toolbar {
+  max-width: 900px;
+  width: 100%;
+  margin-inline: auto;
 }

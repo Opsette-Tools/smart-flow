@@ -1,9 +1,11 @@
 import { Handle, Position, type NodeProps } from "reactflow";
 
 /**
- * Custom React Flow nodes for SmartFlow's diagrams. All are render-only — the
- * diagram never lets the user move or connect nodes (that's done in the build
- * panel), so handles exist purely as edge anchor points and are hidden.
+ * Custom React Flow nodes for SmartFlow's outline diagrams (flowchart,
+ * decision tree, org chart, timeline). All are render-only — these diagrams are
+ * generated from pasted text, so handles exist purely as edge anchor points and
+ * are hidden. The swimlane no longer renders here; it has its own canvas in
+ * ../schemamap.
  *
  * Every node exposes target anchors on left+top and source anchors on
  * right+bottom; each layout picks the handle pair that routes cleanly.
@@ -39,14 +41,6 @@ const ellipsis: React.CSSProperties = {
   width: "100%",
 };
 
-export function LaneNode({ data }: NodeProps<{ name: string }>) {
-  return (
-    <div className="sf-rf-lane" style={{ width: "100%", height: "100%" }}>
-      <div className="sf-rf-lane-head">{data.name}</div>
-    </div>
-  );
-}
-
 const wrapLabel: React.CSSProperties = {
   width: "100%",
   whiteSpace: "normal",
@@ -54,15 +48,11 @@ const wrapLabel: React.CSSProperties = {
   lineHeight: 1.25,
 };
 
-export function ItemNode({ data }: NodeProps<{ label: string; flagged?: boolean }>) {
+export function ItemNode({ data }: NodeProps<{ label: string }>) {
   return (
-    <div className={`sf-rf-item${data.flagged ? " sf-rf-flagged" : ""}`}>
+    <div className="sf-rf-item">
       <Anchors />
       <span style={wrapLabel}>{data.label}</span>
-      {/* Discovery: this step has an unanswered question on it. A corner mark
-          rather than the text itself — the question can be a full sentence and
-          would blow out the card. */}
-      {data.flagged && <span className="sf-rf-flag" aria-hidden="true" />}
     </div>
   );
 }
@@ -104,7 +94,6 @@ export function MilestoneNode({ data }: NodeProps<{ label: string; note?: string
 }
 
 export const nodeTypes = {
-  laneNode: LaneNode,
   itemNode: ItemNode,
   decisionNode: DecisionNode,
   endpointNode: EndpointNode,

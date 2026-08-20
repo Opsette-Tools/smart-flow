@@ -131,9 +131,19 @@ export interface Item {
   openQuestion?: string;
 }
 
+/** Where a lane's card sits on the schema map, once it has been dragged. */
+export interface CardPosition {
+  x: number;
+  y: number;
+}
+
 export interface SmartFlowDoc {
   lanes: Lane[];
   items: Item[];
+  /** Schema-map layout, keyed by lane id. Absent = never dragged, so the card
+   *  falls back to its computed grid slot. Purely presentational: moving a card
+   *  never changes which lane a step belongs to. */
+  lanePositions?: Record<string, CardPosition>;
   /** Discovery mode is per-document — a discovery doc stays a discovery doc. */
   discovery?: boolean;
   /** The written summary. Generated from the findings, then freely edited —

@@ -72,7 +72,7 @@ export function GapsPanel({ doc, dispatch }: Props) {
     return (
       <section className="sf-gaps">
         <div className="sf-section-head">
-          <h2 className="sf-section-title">What this found</h2>
+          <h2 className="sf-section-title">Findings</h2>
         </div>
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -320,7 +320,7 @@ Blank just means you haven&apos;t filled it in yet.
   return (
     <section className="sf-gaps">
       <div className="sf-section-head">
-        <h2 className="sf-section-title">What this found</h2>
+        <h2 className="sf-section-title">Findings</h2>
 
       </div>
       <Collapse items={items} defaultActiveKey={["handoffs"]} className="sf-gaps-collapse" />
