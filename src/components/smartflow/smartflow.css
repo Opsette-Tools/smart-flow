@@ -646,7 +646,6 @@ html.dark .sf-rf-endpoint {
   display: flex;
   flex-direction: column;
   gap: var(--ops-space-md);
-  margin-top: var(--ops-space-xl);
 }
 .sf-mech-row {
   display: flex;
@@ -1293,11 +1292,19 @@ html.dark .sf-panel-foot {
   display: flex;
   flex-direction: column;
 }
-/* The label needs real air under it. At 2px the input crowded its own name. */
+/* A label sits close to the field it names. The air BETWEEN blocks comes from
+   the block's own top margin below, never from the label, so a label can never
+   drift halfway between two fields. */
 .sf-field-title {
   margin: 0 0 var(--ops-space-sm);
   font-size: var(--ops-fs-caption);
   font-weight: 600;
+}
+/* Any labelled block that follows something inside the same group gets real
+   separation, so an input never sits flush on the field above it. */
+.sf-field-group > * + .sf-field-title,
+.sf-field-group > * + .sf-mech-list {
+  margin-top: var(--ops-space-xl);
 }
 
 /* ---- ResizableDrawer chrome ---------------------------------------------- */
