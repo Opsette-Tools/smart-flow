@@ -12,6 +12,7 @@
  */
 
 import type { CardPosition, Connection, HandoffMechanism, Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
+import { connectionMechanisms } from "./types";
 import { uuid } from "@/lib/uuid";
 import { leadToClientDoc } from "./templates";
 
@@ -62,7 +63,7 @@ export function loadDoc(): SmartFlowDoc | null {
     if ((parsed?.v !== 1 && parsed?.v !== 2) || !parsed.doc) return null;
     const doc = parsed.doc;
     if (!Array.isArray(doc.lanes) || !Array.isArray(doc.items)) return null;
-    // v1 -> v2 is a no-op read: every discovery field is optional, so a v1 doc
+    // v1 -> v2 is a no-op read: every added field is optional, so a v1 doc
     // loads untouched. All this does is re-assert the invariants.
     return {
       lanes: doc.lanes,
@@ -71,7 +72,6 @@ export function loadDoc(): SmartFlowDoc | null {
         connectsTo: Array.isArray(i.connectsTo) ? i.connectsTo : [],
         connections: Array.isArray(i.connections) ? i.connections : undefined,
       })),
-      discovery: doc.discovery === true,
       summary: typeof doc.summary === "string" ? doc.summary : undefined,
       lanePositions: readPositions(doc.lanePositions),
     };
@@ -134,7 +134,7 @@ function renormalizeAll(doc: SmartFlowDoc): SmartFlowDoc {
   const scopes: (string | null)[] = [null, ...doc.lanes.map((l) => l.id)];
   for (const scope of scopes) items = renormalizeItemsInScope(items, scope);
   // Spread the doc rather than rebuilding it: renormalizing is about `order`,
-  // and must not quietly drop discovery mode, the summary, or the map layout.
+  // and must not quietly drop the summary or the map layout.
   return { ...doc, lanes: renormalizeLanes(doc.lanes), items };
 }
 
@@ -169,12 +169,24 @@ function upsertConnection(
   const existing = item.connections ?? [];
   const found = existing.find((c) => c.toId === toId);
   const merged: Connection = { ...(found ?? { toId }), ...patch };
+  // Keep the pair consistent: `mechanism` is always the first of `mechanisms`,
+  // so readers that only know the single field still get the primary answer.
+  if (merged.mechanisms) {
+    if (merged.mechanisms.length === 0) {
+      delete merged.mechanisms;
+      delete merged.mechanism;
+    } else {
+      merged.mechanism = merged.mechanisms[0];
+      if (merged.mechanisms.length === 1) delete merged.mechanisms;
+    }
+  }
+
   // Clearing the mechanism clears the system name with it — a bare name with
   // no mechanism is meaningless and would linger invisibly.
-  if (merged.mechanism === undefined) delete merged.systemName;
-  if (merged.mechanism !== "system") delete merged.systemName;
+  const all = connectionMechanisms(merged);
+  if (!all.some((m) => m === "system")) delete merged.systemName;
 
-  const isEmpty = merged.mechanism === undefined && !merged.systemName;
+  const isEmpty = all.length === 0 && !merged.systemName;
   const next = isEmpty
     ? existing.filter((c) => c.toId !== toId)
     : found
@@ -209,13 +221,12 @@ export type Action =
   | { type: "REORDER_ITEMS"; laneId: string | null; orderedIds: string[] }
   | { type: "SET_CONNECTIONS"; id: string; connectsTo: string[] }
   // --- Discovery layer ---
-  | { type: "SET_DISCOVERY"; on: boolean }
   /** Schema map: remember where a lane card was dragged to. */
   | { type: "SET_LANE_POSITION"; laneId: string; x: number; y: number }
   /** Schema map: forget every hand-placement, back to the computed grid. */
   | { type: "RESET_LANE_POSITIONS" }
   | { type: "SET_SUMMARY"; text: string }
-  | { type: "SET_MECHANISM"; id: string; toId: string; mechanism?: HandoffMechanism }
+  | { type: "SET_MECHANISMS"; id: string; toId: string; mechanisms: HandoffMechanism[] }
   | { type: "SET_SYSTEM_NAME"; id: string; toId: string; systemName: string }
   | { type: "SET_SYSTEM_OF_RECORD"; id: string; systemOfRecord: string }
   | { type: "SET_OPEN_QUESTION"; id: string; openQuestion: string }
@@ -356,7 +367,7 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
       const cleaned = Array.from(new Set(action.connectsTo)).filter(
         (id) => id !== action.id && valid.has(id),
       );
-      // Removing an arrow removes its discovery detail with it — a mechanism
+      // Removing an arrow removes its detail with it — a mechanism
       // for an edge that no longer exists would sit invisible in the gaps count.
       const keep = new Set(cleaned);
       return {
@@ -373,20 +384,19 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
       };
     }
 
-    case "SET_DISCOVERY":
-      return { ...doc, discovery: action.on };
-
     case "SET_SUMMARY":
       return { ...doc, summary: action.text || undefined };
 
-    case "SET_MECHANISM": {
+    case "SET_MECHANISMS": {
       // Only annotate an arrow that actually exists.
       const source = doc.items.find((i) => i.id === action.id);
       if (!source || !source.connectsTo.includes(action.toId)) return doc;
       return {
         ...doc,
         items: doc.items.map((i) =>
-          i.id === action.id ? upsertConnection(i, action.toId, { mechanism: action.mechanism }) : i,
+          i.id === action.id
+            ? upsertConnection(i, action.toId, { mechanisms: action.mechanisms })
+            : i,
         ),
       };
     }
@@ -444,9 +454,7 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
     }
 
     case "RESET":
-      // Start over clears content, not the mode. Wiping the board mid-interview
-      // shouldn't silently drop you out of discovery.
-      return { ...emptyDoc, discovery: doc.discovery };
+      return emptyDoc;
 
     case "REPLACE_DOC":
       return action.doc;

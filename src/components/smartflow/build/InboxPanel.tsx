@@ -34,7 +34,7 @@ function InboxItemRow({
 
   return (
     <div ref={setNodeRef} style={style} className={`sf-inbox-row${isDragging ? " is-dragging" : ""}`}>
-      <span className="sf-card-grip" {...attributes} {...listeners} aria-label="Drag to a lane">
+      <span className="sf-step-grip" {...attributes} {...listeners} aria-label="Drag to a lane">
         <HolderOutlined />
       </span>
       <span className="sf-inbox-label">{item.label}</span>

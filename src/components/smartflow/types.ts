@@ -108,7 +108,15 @@ export function mechanismToValue(m: HandoffMechanism | undefined): string | unde
  *  which is a real and different state from "asked, and it's manual". */
 export interface Connection {
   toId: string;
+  /** The primary mechanism. Kept as the first entry of `mechanisms` so every
+   *  existing reader (gaps, map, summary) keeps working unchanged, and so v1/v2
+   *  docs that only ever wrote this field still read correctly. */
   mechanism?: HandoffMechanism;
+  /** Every mechanism on this handoff, in the order they were picked. A real
+   *  answer is often compound: "a spreadsheet, sent by email" is two rungs, not
+   *  one, and forcing a single pick loses half the finding. Absent means the
+   *  handoff has at most the single `mechanism` above. */
+  mechanisms?: HandoffMechanism[];
   /** Free text when mechanism is "system" — e.g. "QuickBooks". */
   systemName?: string;
 }
@@ -131,6 +139,24 @@ export interface Item {
   openQuestion?: string;
 }
 
+/** Every mechanism on a connection, single or compound, in pick order. The one
+ *  place that reconciles `mechanism` with `mechanisms`, so no caller has to. */
+export function connectionMechanisms(c: Connection | undefined): HandoffMechanism[] {
+  if (!c) return [];
+  if (c.mechanisms && c.mechanisms.length > 0) return c.mechanisms;
+  return c.mechanism ? [c.mechanism] : [];
+}
+
+/** "a spreadsheet", "a spreadsheet and email", "a spreadsheet, email and chat".
+ *  Written out rather than joined with commas so the drawer and the summary
+ *  read as sentences. */
+export function mechanismListLabel(list: HandoffMechanism[]): string {
+  const labels = list.map(mechanismLabel);
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
 /** Where a lane's card sits on the schema map, once it has been dragged. */
 export interface CardPosition {
   x: number;
@@ -144,7 +170,9 @@ export interface SmartFlowDoc {
    *  falls back to its computed grid slot. Purely presentational: moving a card
    *  never changes which lane a step belongs to. */
   lanePositions?: Record<string, CardPosition>;
-  /** Discovery mode is per-document — a discovery doc stays a discovery doc. */
+  /** Legacy: discovery used to be a mode you toggled. Every step now always
+   *  carries the handoff, record, and question fields, so nothing reads this.
+   *  Kept optional so saved docs still parse. */
   discovery?: boolean;
   /** The written summary. Generated from the findings, then freely edited —
    *  once it exists only an explicit Regenerate overwrites it. */

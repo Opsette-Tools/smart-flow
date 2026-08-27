@@ -3,10 +3,13 @@ import { Input, Select } from "antd";
 import type { Action } from "../store";
 import {
   MECHANISMS,
+  connectionMechanisms,
+  mechanismListLabel,
   isCustomMechanism,
   mechanismToValue,
   parseMechanism,
   type Connection,
+  type HandoffMechanism,
   type Item,
   type Lane,
 } from "../types";
@@ -17,8 +20,6 @@ interface Props {
   allItems: Item[];
   lanes: Lane[];
   dispatch: Dispatch<Action>;
-  /** Discovery mode: show a mechanism row per connection ("how does it move?"). */
-  discovery?: boolean;
 }
 
 /**
@@ -26,11 +27,11 @@ interface Props {
  * Inbox group for unplaced steps), so the user can draw handoffs by name. Self-
  * reference is impossible (the item is excluded from its own option list).
  *
- * In discovery mode each selected connection also gets a mechanism row beneath
- * the select — how the work physically moves across that arrow. That's the
- * finding; the arrow alone only says the handoff exists.
+ * Each selected connection also gets a handoff method beneath the select. The
+ * arrow alone only says a handoff exists. The method says what carries it: an
+ * email, a spreadsheet, someone walking over.
  */
-export function ConnectionEditor({ item, allItems, lanes, dispatch, discovery = false }: Props) {
+export function ConnectionEditor({ item, allItems, lanes, dispatch }: Props) {
   const laneName = new Map(lanes.map((l) => [l.id, l.name] as const));
 
   // Build grouped options: one group per lane (in column order), then Inbox.
@@ -70,7 +71,6 @@ export function ConnectionEditor({ item, allItems, lanes, dispatch, discovery = 
     <>
       <Select
         mode="multiple"
-        size="small"
         allowClear
         style={{ width: "100%" }}
         placeholder="Leads to…"
@@ -114,75 +114,83 @@ export function ConnectionEditor({ item, allItems, lanes, dispatch, discovery = 
         }}
       />
 
-      {discovery && item.connectsTo.length > 0 && (
+      {item.connectsTo.length > 0 && (
         <div className="sf-mech-list">
+          <h4 className="sf-field-title">Handoff method</h4>
           {item.connectsTo.map((toId) => {
             const detail = detailFor(toId);
+            const picked = connectionMechanisms(detail);
             return (
               <div key={toId} className="sf-mech-row">
-                {/* Name BOTH ends. "→ Process Engineering" alone is a fragment —
-                    you have to remember which step you are standing in to read
-                    it. The whole question belongs on the screen. */}
-                <span className="sf-mech-target" title={`${item.label} → ${labelFor(toId)}`}>
-                  <strong>{item.label}</strong> → <strong>{labelFor(toId)}</strong>
-                </span>
-                {/* The label has to survive selection — a placeholder alone
-                    disappears the moment a value is picked, leaving a bare
-                    dropdown with no name on it. */}
-                <span className="sf-mech-label">Handoff method</span>
-                <Select<string>
-                  size="small"
-                  allowClear
-                  className={`sf-mech-select${detail?.mechanism ? "" : " sf-field-unfilled"}`}
-                  placeholder="Email, spreadsheet, phone call…"
-                  value={mechanismToValue(detail?.mechanism)}
-                  // The eight rungs are suggestions, not a cage — this is a
-                  // discovery tool, and the answer that doesn't fit the list is
-                  // usually the most interesting one in the room.
-                  mode="tags"
-                  maxCount={1}
-                  options={MECHANISMS}
-                  optionFilterProp="label"
-                  onChange={(next) => {
-                    // Tag mode hands back an array; we only ever keep one.
-                    const raw = Array.isArray(next) ? next[next.length - 1] : next;
-                    dispatch({
-                      type: "SET_MECHANISM",
-                      id: item.id,
-                      toId,
-                      mechanism: raw ? parseMechanism(raw) : undefined,
-                    });
-                    haptic("tap");
-                  }}
-                />
-                {detail?.mechanism === "system" && (
-                  <Input
-                    // Uncontrolled (commits on blur/Enter so typing isn't a
-                    // dispatch per keystroke) — key it to the doc value so a
-                    // template load or Start over doesn't leave stale text.
-                    key={detail.systemName ?? ""}
-                    size="small"
-                    className="sf-mech-system"
-                    placeholder="Name the system"
-                    defaultValue={detail.systemName ?? ""}
-                    onBlur={(e) =>
-                      dispatch({
-                        type: "SET_SYSTEM_NAME",
-                        id: item.id,
-                        toId,
-                        systemName: e.target.value,
-                      })
-                    }
-                    onPressEnter={(e) =>
-                      dispatch({
-                        type: "SET_SYSTEM_NAME",
-                        id: item.id,
-                        toId,
-                        systemName: (e.target as HTMLInputElement).value,
-                      })
-                    }
+                {/* Reads as a sentence, the way the summary does. Naming both
+                    ends matters: "→ Process Engineering" alone is a fragment,
+                    and you'd have to remember which step you were standing in
+                    to make sense of it. */}
+                <p className="sf-mech-sentence">
+                  <strong>{item.label}</strong> hands off to{" "}
+                  <strong>{labelFor(toId)}</strong>
+                  {picked.length > 0 ? (
+                    <>
+                      {" "}
+                      via <strong>{mechanismListLabel(picked)}</strong>
+                      {picked.some((m) => m === "system") && detail?.systemName
+                        ? ` (${detail.systemName})`
+                        : ""}
+                      .
+                    </>
+                  ) : (
+                    <span className="sf-mech-unset"> via …</span>
+                  )}
+                </p>
+                <div className="sf-mech-controls">
+                  <Select<string[]>
+                    allowClear
+                    className={`sf-mech-select${picked.length ? "" : " sf-field-unfilled"}`}
+                    placeholder="Email, spreadsheet, phone call…"
+                    value={picked.map((m) => mechanismToValue(m) as string)}
+                    // Multiple, because a real handoff is often compound: a
+                    // spreadsheet SENT BY email is two rungs, and making someone
+                    // pick one loses half the answer. Tag mode keeps the eight
+                    // rungs as suggestions rather than a cage.
+                    mode="tags"
+                    options={MECHANISMS}
+                    optionFilterProp="label"
+                    onChange={(next) => {
+                      const list = (next ?? [])
+                        .map((raw) => parseMechanism(raw))
+                        .filter((m): m is HandoffMechanism => m !== undefined);
+                      dispatch({ type: "SET_MECHANISMS", id: item.id, toId, mechanisms: list });
+                      haptic("tap");
+                    }}
                   />
-                )}
+                  {picked.some((m) => m === "system") && (
+                    <Input
+                      // Uncontrolled (commits on blur/Enter so typing isn't a
+                      // dispatch per keystroke). Keyed to the doc value so a
+                      // template load or Start over doesn't leave stale text.
+                      key={detail?.systemName ?? ""}
+                      className="sf-mech-system"
+                      placeholder="Name the system"
+                      defaultValue={detail?.systemName ?? ""}
+                      onBlur={(e) =>
+                        dispatch({
+                          type: "SET_SYSTEM_NAME",
+                          id: item.id,
+                          toId,
+                          systemName: e.target.value,
+                        })
+                      }
+                      onPressEnter={(e) =>
+                        dispatch({
+                          type: "SET_SYSTEM_NAME",
+                          id: item.id,
+                          toId,
+                          systemName: (e.target as HTMLInputElement).value,
+                        })
+                      }
+                    />
+                  )}
+                </div>
               </div>
             );
           })}

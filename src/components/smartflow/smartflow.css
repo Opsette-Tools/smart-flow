@@ -238,48 +238,6 @@ html.dark .sf-section-hint {
   gap: var(--ops-space-lg);
 }
 
-/* ---- Lane manager (chips) ------------------------------------------------ */
-.sf-lane-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ops-space-sm);
-  align-items: center;
-}
-.sf-lane-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ops-space-xs);
-  padding: 6px 6px 6px 12px;
-  border: 1px solid var(--sf-border, #e5e7eb);
-  border-radius: 999px;
-  background: var(--sf-chip-bg, #fff);
-  font-size: var(--ops-fs-caption);
-  cursor: grab;
-  user-select: none;
-}
-.sf-lane-chip:active {
-  cursor: grabbing;
-}
-.sf-lane-chip.is-dragging {
-  opacity: 0.5;
-}
-html.dark .sf-lane-chip {
-  --sf-border: #333;
-  --sf-chip-bg: #1f1f1f;
-}
-.sf-lane-chip-grip {
-  color: #b8b8b8;
-  display: inline-flex;
-}
-.sf-lane-chip-order {
-  color: var(--ops-green);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-html.dark .sf-lane-chip-order {
-  color: var(--ops-gold);
-}
-
 /* ---- Inbox items --------------------------------------------------------- */
 .sf-inbox-list {
   display: flex;
@@ -315,22 +273,23 @@ html.dark .sf-inbox-row {
 
 /* ---- Lane columns -------------------------------------------------------- */
 .sf-lanes-scroll {
-  /* No horizontal scroll: lanes wrap onto the next row instead. The page
-     scrolls vertically as normal — no floating mid-page scrollbar. */
+  /* Five lanes will not wrap into readable columns, and a wrapped swimlane
+     stops reading left-to-right, which is the whole point of the diagram. So
+     the board scrolls sideways and each lane keeps a usable width. */
+  overflow-x: auto;
   padding-bottom: var(--ops-space-sm);
+  overscroll-behavior-x: contain;
 }
 .sf-lanes-row {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--ops-grid-gap);
-  align-items: stretch;
+  align-items: flex-start;
+  min-width: min-content;
 }
 .sf-lane-col {
-  /* Grow to share the row, but ~280px basis so about six fit per row at a
-     typical desktop width; extra lanes wrap to the next row. */
-  flex: 1 1 280px;
-  max-width: 420px;
-  min-width: 240px;
+  /* Fixed-width columns on a scrolling track. A lane that shrinks to fit more
+     lanes on screen is a lane you cannot read. */
+  flex: 0 0 300px;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--sf-border, #e8e8e8);
@@ -350,23 +309,62 @@ html.dark .sf-lane-col {
   display: flex;
   align-items: center;
   gap: var(--ops-space-sm);
-  padding: 10px var(--ops-space-md);
+  padding: 9px 6px 9px var(--ops-space-md);
   background: var(--ops-green);
   color: #fff;
 }
+/* The lane's left-to-right position. Sequence was invisible on this page.
+   Both levels carry a number now, so order can be read off the board. */
+.sf-lane-col-order {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* The clickable half of the lane head: number plus name, opens the review. */
+.sf-lane-col-open {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-sm);
+  min-width: 0;
+  padding: 3px 6px 3px 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+.sf-lane-col-open:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.sf-lane-col-open:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 1px;
+}
 .sf-lane-col-name {
   flex: 1 1 auto;
+  margin: 0;
   font-weight: 600;
   font-size: var(--ops-fs-lane);
-  border: none;
-  background: transparent;
   color: #fff;
   min-width: 0;
-}
-.sf-lane-col-name::placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sf-lane-col-count {
+  flex: 0 0 auto;
   font-size: var(--ops-fs-fine);
   color: rgba(255, 255, 255, 0.75);
   font-variant-numeric: tabular-nums;
@@ -393,66 +391,139 @@ html.dark .sf-lane-empty {
   padding: 0 var(--ops-space-md) var(--ops-space-md);
 }
 
-/* ---- Lane item card ------------------------------------------------------ */
-.sf-card {
-  border: 1px solid var(--sf-border, #e5e7eb);
-  border-radius: var(--ops-radius);
-  background: var(--sf-card-bg, #fff);
-  padding: var(--ops-space-sm) var(--ops-space-sm) var(--ops-space-sm) 0;
-}
-html.dark .sf-card {
-  --sf-border: #303030;
-  --sf-card-bg: #1d1d1d;
-}
-.sf-card.is-dragging {
-  opacity: 0.5;
-}
-.sf-card-top {
+/* ---- Step: the board face of an item ------------------------------------ */
+/* Deliberately light. A step is a line of text with a number, not a panel.
+   The lane head is the only heavy surface, and that contrast is what makes a
+   step read as sitting inside a lane. */
+.sf-step {
   display: flex;
   align-items: center;
   gap: var(--ops-space-xs);
+  padding: 6px 4px 6px 0;
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  background: var(--sf-card-bg, #fff);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-.sf-card-grip {
+html.dark .sf-step {
+  --sf-border: #303030;
+  --sf-card-bg: #1d1d1d;
+}
+.sf-step:hover {
+  border-color: var(--ops-green-light);
+}
+.sf-step:focus-visible {
+  outline: 2px solid var(--ops-green-light);
+  outline-offset: 1px;
+}
+/* The selected step is the one the inspector is showing. The two have to be
+   visibly tied together or the panel looks like it belongs to nothing. */
+.sf-step.is-selected {
+  border-color: var(--ops-green);
+  box-shadow: inset 3px 0 0 var(--ops-green);
+}
+html.dark .sf-step.is-selected {
+  border-color: var(--ops-gold);
+  box-shadow: inset 3px 0 0 var(--ops-gold);
+}
+.sf-step.is-dragging {
+  opacity: 0.5;
+}
+.sf-step.is-overlay {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  padding-left: 10px;
+}
+.sf-step-grip {
   flex: 0 0 auto;
-  width: 28px;
+  width: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #c0c0c0;
+  color: #c8c8c8;
   cursor: grab;
   align-self: stretch;
 }
-.sf-card-grip:active {
+.sf-step-grip:active {
   cursor: grabbing;
 }
-.sf-card-label {
+/* The sequence anchor. The board had no way to say "this is third", which is
+   most of what a swimlane is for. */
+.sf-step-seq {
+  flex: 0 0 auto;
+  min-width: 18px;
+  font-size: var(--ops-fs-fine);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ops-green-light);
+}
+html.dark .sf-step-seq {
+  color: var(--ops-gold);
+}
+.sf-step-label {
   flex: 1 1 auto;
   font-size: var(--ops-fs-body);
   min-width: 0;
+  overflow-wrap: anywhere;
 }
-.sf-card-actions {
+.sf-step-handoffs {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
+  gap: 3px;
+  font-size: var(--ops-fs-fine);
+  font-variant-numeric: tabular-nums;
+  color: #8a8a8a;
 }
-.sf-card-connect {
-  padding: var(--ops-space-xs) 0 0 28px;
+html.dark .sf-step-handoffs {
+  color: #9d9b93;
+}
+/* Amber dot: this step still owes the interview an answer. */
+.sf-step-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ops-gold);
+}
+.sf-step-menu {
+  flex: 0 0 auto;
+  display: inline-flex;
 }
 
-/* ---- Connection summary chips on a card --------------------------------- */
-.sf-conn-row {
-  display: flex;
-  flex-wrap: wrap;
+/* A quiet icon button. One definition for the card and lane-head kebabs, so
+   the page stops growing a new button style per surface. */
+.sf-icon-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 0 0 28px;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #9a9a9a;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
 }
-.sf-conn-arrow {
-  color: var(--ops-green-light);
-  font-size: var(--ops-fs-fine);
+.sf-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ops-green);
 }
-html.dark .sf-conn-arrow {
+html.dark .sf-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: var(--ops-gold);
+}
+/* On the green lane band the same button has to invert. */
+.sf-icon-btn.is-on-band {
+  color: rgba(255, 255, 255, 0.75);
+}
+.sf-icon-btn.is-on-band:hover,
+html.dark .sf-icon-btn.is-on-band:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
 /* ---- Diagram mode -------------------------------------------------------- */
@@ -549,10 +620,9 @@ html.dark .sf-rf-endpoint {
     min-width: 0;
   }
   .sf-lane-col {
-    flex: 1 1 auto;
-    width: 100%;
-    max-width: none;
-    min-width: 0;
+    /* Almost the full viewport, with the next lane peeking so the sideways
+       scroll is discoverable instead of hidden. */
+    flex: 0 0 82vw;
   }
   .sf-inbox-assign {
     width: 140px;
@@ -567,122 +637,57 @@ html.dark .sf-rf-endpoint {
 .sf-build-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ops-space-sm);
+  gap: var(--ops-space-md);
   flex-wrap: wrap;
 }
-
-.sf-discovery-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--ops-fs-fine);
-  color: #6b6b6b;
-  cursor: pointer;
-  user-select: none;
-}
-html.dark .sf-discovery-toggle {
-  color: #b9b7ae;
-}
-
-/* Per-connection mechanism rows, under the "Leads to" select. */
+/* Discovery mode sits to the right of the add-lane field, with the kebab last. */
+.sf-build-actions /* Per-handoff mechanism rows, in the inspector. */
 .sf-mech-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
-  padding-left: 10px;
-  border-left: 2px solid var(--sf-border, #e8e8e8);
-}
-html.dark .sf-mech-list {
-  --sf-border: #3a3a38;
+  gap: var(--ops-space-md);
+  margin-top: var(--ops-space-xl);
 }
 .sf-mech-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  padding: var(--ops-space-sm) var(--ops-space-md);
+  border-radius: var(--ops-radius);
+  background: var(--sf-mech-bg, #f7f7f5);
 }
-.sf-mech-target {
-  font-size: var(--ops-fs-fine);
-  color: #8a8a8a;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+html.dark .sf-mech-row {
+  --sf-mech-bg: #232322;
 }
-html.dark .sf-mech-target {
-  color: #9d9b93;
+/* The handoff as a readable line, the way the summary writes it. The drawer
+   should not be the one place the pieces never come together. */
+.sf-mech-sentence {
+  margin: 0;
+  font-size: var(--ops-fs-caption);
+  line-height: 1.5;
+  color: #5f5f5f;
+}
+html.dark .sf-mech-sentence {
+  color: #b9b7ae;
+}
+.sf-mech-sentence strong {
+  font-weight: 600;
+  color: inherit;
+}
+.sf-mech-unset {
+  color: #a89152;
+}
+html.dark .sf-mech-unset {
+  color: var(--ops-gold);
+}
+.sf-mech-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .sf-mech-select,
 .sf-mech-system {
   width: 100%;
-}
-
-/* Details disclosure: system of record + open question. */
-.sf-card-details {
-  /* The card itself has no left padding — each child clears the 28px drag grip
-     on its own (see .sf-card-connect / .sf-conn-row). The rule keeps the dashed
-     divider full-bleed while the fields stay aligned with everything above. */
-  margin: 8px 0 0 28px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--sf-border, #e8e8e8);
-}
-html.dark .sf-card-details {
-  --sf-border: #3a3a38;
-}
-.sf-details-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: var(--ops-fs-fine);
-  color: #6b6b6b;
-  /* Comfortable touch target without making the card taller than the text. */
-  min-height: 32px;
-}
-html.dark .sf-details-toggle {
-  color: #b9b7ae;
-}
-.sf-details-toggle:hover {
-  color: var(--ops-green-light);
-}
-html.dark .sf-details-toggle:hover {
-  color: var(--ops-gold);
-}
-/* Marks a collapsed Details that has something in it. */
-.sf-details-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ops-gold);
-}
-.sf-details-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 6px;
-  padding-bottom: 2px;
-}
-.sf-details-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.sf-details-label {
-  font-size: var(--ops-fs-fine);
-  color: #8a8a8a;
-}
-html.dark .sf-details-label {
-  color: #9d9b93;
-}
-
-/* Open-question flag on the card header. */
-.sf-card-flag {
-  flex: 0 0 auto;
-  color: var(--ops-gold);
-  font-size: 14px;
 }
 
 /* ---- Gaps panel --------------------------------------------------------- */
@@ -770,9 +775,6 @@ html.dark .sf-gap-group-name {
     align-items: stretch;
     gap: var(--ops-space-md);
   }
-  .sf-discovery-toggle {
-    justify-content: space-between;
-  }
   .sf-gap-list li {
     gap: 6px;
   }
@@ -790,16 +792,6 @@ html.dark .sf-gaps-todo {
 }
 .sf-gaps-todo-title {
   font-size: var(--ops-fs-sub);
-}
-
-/* The label above a handoff-method select. A placeholder alone vanishes the
-   moment a value is picked, leaving an unnamed dropdown. */
-.sf-mech-label {
-  font-size: var(--ops-fs-fine);
-  color: #8a8a8a;
-}
-html.dark .sf-mech-label {
-  color: #9d9b93;
 }
 
 /* An unfilled discovery field. Soft amber — visible while scanning the board,
@@ -820,29 +812,6 @@ html.dark
   .ant-select-selector {
   background: rgba(207, 174, 96, 0.14);
   border-color: rgba(207, 174, 96, 0.5);
-}
-
-/* ---- Condensed build header --------------------------------------------- */
-/* Lanes on one line: heading, add field, then chips flowing after it. */
-.sf-lanes-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--ops-space-md);
-  flex-wrap: wrap;
-}
-.sf-lanes-bar-title {
-  flex: 0 0 auto;
-  margin: 0;
-}
-.sf-lanes-bar-add {
-  display: flex;
-  gap: 6px;
-  flex: 0 1 300px;
-  min-width: 220px;
-}
-.sf-lanes-bar .sf-lane-chips {
-  margin: 0;
-  flex: 1 1 auto;
 }
 
 /* Inbox header doubles as its collapse control. */
@@ -1224,4 +1193,273 @@ html.dark .sf-map-note.is-question .sf-map-note-method {
   max-width: 900px;
   width: 100%;
   margin-inline: auto;
+}
+
+/* ---- Board + inspector --------------------------------------------------- */
+.sf-board-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+.sf-board-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--ops-space-lg);
+  flex-wrap: wrap;
+}
+/* Names the three levels once, in a sentence, so a presenter doesn't have to. */
+.sf-legend {
+  margin: 4px 0 0;
+  font-size: var(--ops-fs-fine);
+  color: #8a8a8a;
+  max-width: 62ch;
+}
+html.dark .sf-legend {
+  color: #9d9b93;
+}
+.sf-legend-lane,
+.sf-legend-step {
+  font-weight: 600;
+  color: var(--ops-green);
+}
+html.dark .sf-legend-lane,
+html.dark .sf-legend-step {
+  color: var(--ops-gold);
+}
+.sf-lane-add {
+  display: flex;
+  gap: 6px;
+  flex: 0 1 360px;
+  min-width: 220px;
+}
+
+/* ---- Drawer panels ------------------------------------------------------- */
+/* Both panels are plain flow content inside ResizableDrawer's scrolling well.
+   Nothing here sets height or a background: a full-height opaque child paints
+   over the drawer's absolutely-positioned resize handle. */
+.sf-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-lg);
+  padding: var(--ops-space-lg) var(--ops-space-md) var(--ops-space-lg) 18px;
+}
+.sf-panel-empty {
+  padding: var(--ops-space-xl) var(--ops-space-md) var(--ops-space-xl) 18px;
+  text-align: center;
+}
+.sf-inspector-empty-text {
+  font-size: var(--ops-fs-fine);
+  color: #8a8a8a;
+}
+html.dark .sf-inspector-empty-text {
+  color: #9d9b93;
+}
+.sf-panel-head {
+  padding-bottom: var(--ops-space-md);
+  border-bottom: 1px solid var(--sf-border, #ececec);
+}
+html.dark .sf-panel-head {
+  --sf-border: #2a2a2a;
+}
+/* Which lane this step belongs to. The panel sits away from the board, so it
+   has to say where the step came from. */
+.sf-inspector-lane {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ops-green-light);
+  font-weight: 600;
+}
+html.dark .sf-inspector-lane {
+  color: var(--ops-gold);
+}
+.sf-panel-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-xl);
+}
+.sf-panel-foot {
+  padding-top: var(--ops-space-sm);
+  border-top: 1px solid var(--sf-border, #eee);
+}
+html.dark .sf-panel-foot {
+  --sf-border: #2a2a2a;
+}
+
+/* A labelled field group. The old card stacked five zones and named one. */
+.sf-field-group {
+  display: flex;
+  flex-direction: column;
+}
+/* The label needs real air under it. At 2px the input crowded its own name. */
+.sf-field-title {
+  margin: 0 0 var(--ops-space-sm);
+  font-size: var(--ops-fs-caption);
+  font-weight: 600;
+}
+
+/* ---- ResizableDrawer chrome ---------------------------------------------- */
+/* The drawer itself is components/common/ResizableDrawer.tsx. Its handle and
+   shield are inline-styled there (they are behavioral, not themeable); these
+   rules are the toolbar and the content well.
+
+   The content well is height: calc(100% - 44px) under a fixed 44px bar, which
+   is what keeps the handle reachable: a child that is height: 100% with its own
+   background paints straight over an absolutely-positioned handle. */
+/* AntD still renders (and lays out) its own .ant-drawer-header whenever the
+   drawer has a title or a close button. Ours is hidden so the toolbar below is
+   the only header, on one row: title left, close hard right. */
+.ops-resizable-drawer .ant-drawer-header {
+  display: none !important;
+}
+
+.ops-drawer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Never wrap: the title and the close button share one row, always. */
+  flex-wrap: nowrap;
+  gap: var(--ops-space-sm);
+  min-height: 44px;
+  padding: 0 8px 0 18px;
+  border-bottom: 1px solid var(--sf-border, rgba(0, 0, 0, 0.08));
+  background: var(--sf-bar-bg, #fff);
+}
+html.dark .ops-drawer-bar {
+  --sf-border: #2a2a2a;
+  --sf-bar-bg: #1f1f1e;
+}
+.ops-drawer-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ops-green);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html.dark .ops-drawer-title {
+  color: var(--ops-gold);
+}
+/* Editable title. Reads as the heading until you click it, so the toolbar
+   doesn't grow a form control it doesn't need. */
+.ops-drawer-title-input {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  background: transparent;
+  font: inherit;
+}
+.ops-drawer-title-input:hover {
+  border-color: var(--sf-border, #e0e0e0);
+}
+.ops-drawer-title-input:focus {
+  outline: none;
+  border-color: var(--ops-green-light);
+  background: var(--sf-bar-bg, #fff);
+}
+html.dark .ops-drawer-title-input:hover {
+  border-color: #3a3a38;
+}
+html.dark .ops-drawer-title-input:focus {
+  border-color: var(--ops-gold);
+  background: #262625;
+}
+.ops-drawer-bar-right {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ops-drawer-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.ops-drawer-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ops-green);
+}
+html.dark .ops-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ops-gold);
+}
+.ops-drawer-content {
+  position: relative;
+  height: calc(100% - 44px);
+  overflow-y: auto;
+}
+
+/* ---- Lane review --------------------------------------------------------- */
+/* Steps are separated by a rule, not boxed. A stack of bordered cards inside a
+   panel reads as clutter; a divider gives the same separation and disappears. */
+.sf-review-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-lg);
+  padding-bottom: var(--ops-space-xl);
+  border-bottom: 1px solid var(--sf-border, #d4d4d4);
+}
+html.dark .sf-review-step {
+  --sf-border: #3d3d3a;
+}
+.sf-review-step:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+/* The step heading is a button: it opens that step's own drawer over the lane
+   drawer, which is the only way in when the lane drawer covers its column. */
+.sf-review-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ops-space-sm);
+  width: 100%;
+  padding: 4px 6px 4px 4px;
+  margin-left: -4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+.sf-review-step-head:hover {
+  background: rgba(47, 79, 70, 0.06);
+}
+html.dark .sf-review-step-head:hover {
+  background: rgba(207, 174, 96, 0.1);
+}
+.sf-review-step-head:focus-visible {
+  outline: 2px solid var(--ops-green-light);
+  outline-offset: 1px;
+}
+.sf-review-step-go {
+  margin-left: auto;
+  font-size: 11px;
+  color: #b0b0b0;
+}
+.sf-review-step-head:hover .sf-review-step-go {
+  color: var(--ops-green);
+}
+html.dark .sf-review-step-head:hover .sf-review-step-go {
+  color: var(--ops-gold);
+}
+.sf-review-step-name {
+  margin: 0;
+  font-size: var(--ops-fs-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }

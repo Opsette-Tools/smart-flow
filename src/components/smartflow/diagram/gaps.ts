@@ -12,8 +12,10 @@
  */
 
 import {
+  connectionMechanisms,
   isCustomMechanism,
   isManualMechanism,
+  mechanismListLabel,
   type HandoffMechanism,
   type Item,
   type KnownMechanism,
@@ -28,6 +30,8 @@ export interface HandoffFinding {
   fromLane: string;
   toLane: string;
   mechanism: HandoffMechanism;
+  /** Every mechanism on this handoff when the answer was compound. */
+  mechanisms?: HandoffMechanism[];
   systemName?: string;
   /** True when the handoff crosses a lane boundary — a board-to-board seam. */
   crossLane: boolean;
@@ -132,7 +136,11 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
         });
       }
 
-      const mechanism = detail.get(toId)?.mechanism;
+      // A handoff can carry several mechanisms ("a spreadsheet, sent by
+      // email"). The first is the primary for ranking; all of them are kept so
+      // the sentence can name the whole answer.
+      const picked = connectionMechanisms(detail.get(toId));
+      const mechanism = picked[0];
       if (mechanism === undefined) {
         unaskedHandoffs.push({ fromLabel: item.label, toLabel: target.label });
       } else {
@@ -147,9 +155,11 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
           fromLane: laneOf(item),
           toLane: laneOf(target),
           mechanism,
+          mechanisms: picked.length > 1 ? picked : undefined,
           systemName: detail.get(toId)?.systemName,
           crossLane,
-          manual: isManualMechanism(mechanism),
+          // Compound answers are manual if ANY leg is carried by a person.
+          manual: picked.some(isManualMechanism),
         });
       }
     }
@@ -261,6 +271,10 @@ export function handoffSentence(h: HandoffFinding): string {
   if (h.mechanism === "system") {
     const where = h.systemName ? h.systemName : "an existing system";
     return `${h.fromLabel} passes to ${h.toLabel} through ${where}.`;
+  }
+  // A compound handoff ("a spreadsheet, sent by email") reads as one phrase.
+  if (h.mechanisms && h.mechanisms.length > 1) {
+    return `${h.fromLabel} hands off to ${h.toLabel} via ${mechanismListLabel(h.mechanisms)}.`;
   }
   return `${h.fromLabel} hands off to ${h.toLabel} ${mechanismPhrase(h.mechanism)}.`;
 }

@@ -17,6 +17,7 @@
 import {
   isCustomMechanism,
   isManualMechanism,
+  connectionMechanisms,
   mechanismLabel,
   type Connection,
   type HandoffMechanism,
@@ -142,11 +143,14 @@ function connectionFor(item: Item, toId: string): Connection | undefined {
 /** The words to show for a handoff's method: the system's NAME when one was
  *  given ("QuickBooks" beats the generic "Existing system"), else the label. */
 function methodText(conn: Connection | undefined): string | undefined {
-  if (!conn?.mechanism) return undefined;
-  const m: HandoffMechanism = conn.mechanism;
-  if (m === "system" && conn.systemName?.trim()) return conn.systemName.trim();
-  if (isCustomMechanism(m)) return m.custom;
-  return mechanismLabel(m);
+  const picked = connectionMechanisms(conn);
+  if (picked.length === 0) return undefined;
+  const one = (m: HandoffMechanism): string => {
+    if (m === "system" && conn?.systemName?.trim()) return conn.systemName.trim();
+    if (isCustomMechanism(m)) return m.custom;
+    return mechanismLabel(m);
+  };
+  return picked.map(one).join(" + ");
 }
 
 /**
@@ -190,13 +194,13 @@ export function buildMap(doc: SmartFlowDoc): MapModel {
           return {
             target: byId.get(toId)!.label,
             method: methodText(conn),
-            manual: conn?.mechanism !== undefined && isManualMechanism(conn.mechanism),
+            manual: connectionMechanisms(conn).some(isManualMechanism),
           };
         });
 
       const system = step.systemOfRecord?.trim() || undefined;
       const question = step.openQuestion?.trim() || undefined;
-      // Storage system and open question each occupy a nested line too.
+      // System of record and open question each occupy a nested line too.
       const extraLines = (system ? 1 : 0) + (question ? 1 : 0);
       const h = rowHeight(notes.length + extraLines);
 
@@ -247,8 +251,8 @@ export function buildMap(doc: SmartFlowDoc): MapModel {
         toLaneId: toLane,
         toStepId: toId,
         color: laneColor(laneOrder.get(fromLane) ?? 0),
-        manual: conn?.mechanism !== undefined && isManualMechanism(conn.mechanism),
-        unasked: conn?.mechanism === undefined,
+        manual: connectionMechanisms(conn).some(isManualMechanism),
+        unasked: connectionMechanisms(conn).length === 0,
         sameLane: fromLane === toLane,
       });
     }

@@ -1,205 +1,173 @@
-import { useState, type Dispatch } from "react";
-import { Button, Input, Tooltip } from "antd";
+import { useState, type Dispatch, type KeyboardEvent } from "react";
+import { Dropdown, Input } from "antd";
 import {
   HolderOutlined,
+  MoreOutlined,
   EditOutlined,
   DeleteOutlined,
+  SwapOutlined,
   ArrowRightOutlined,
-  DownOutlined,
-  RightOutlined,
-  QuestionCircleFilled,
 } from "@ant-design/icons";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Action } from "../store";
 import type { Item, Lane } from "../types";
+import { connectionMechanisms } from "../types";
 import { haptic } from "@/lib/haptics";
-import { ConnectionEditor } from "./ConnectionEditor";
 
 interface Props {
   item: Item;
+  /** 1-based position in its lane. The sequence anchor the board was missing. */
+  index: number;
   allItems: Item[];
   lanes: Lane[];
   dispatch: Dispatch<Action>;
-  /** Discovery mode: mechanism rows + the details fields, expanded by default. */
-  discovery?: boolean;
+  selected?: boolean;
+  onSelect: () => void;
 }
 
-export function LaneItemCard({ item, allItems, lanes, dispatch, discovery = false }: Props) {
+/**
+ * The board face of a step: a number, a name, a handoff count. Handoff method,
+ * storage system, and open question all live in the inspector. A lane column is
+ * about 280px wide, which is not enough room to type "QuickBooks, Airtable,
+ * shared drive, nowhere" into.
+ */
+export function LaneItemCard({
+  item,
+  index,
+  allItems,
+  lanes,
+  dispatch,
+  selected = false,
+  onSelect,
+}: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
-  const [editing, setEditing] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(item.label);
-  // Open by default in discovery mode — you're there to fill these in. Outside
-  // discovery the card must not get heavier for someone drawing a plain lane.
-  const [detailsOpen, setDetailsOpen] = useState(discovery);
 
   const commit = () => {
     const label = draft.trim();
     if (label && label !== item.label) dispatch({ type: "RENAME_ITEM", id: item.id, label });
-    setEditing(false);
+    setRenaming(false);
   };
 
-  // Names of the steps this one leads to, for the read-at-a-glance summary line.
-  const targets = item.connectsTo
-    .map((id) => allItems.find((i) => i.id === id)?.label)
-    .filter((l): l is string => Boolean(l));
+  // Only count handoffs that still resolve to a live step. A deleted target
+  // shouldn't inflate the number on the card face.
+  const handoffCount = item.connectsTo.filter((id) => allItems.some((i) => i.id === id)).length;
+
+  // A step is "open" until it names a system of record and a method on every
+  // handoff. That's what the dot tracks.
+  const needsDetail =
+    !item.systemOfRecord ||
+    item.connectsTo.some(
+      (toId) => connectionMechanisms(item.connections?.find((c) => c.toId === toId)).length === 0,
+    );
+
+  const menuItems = [
+    { key: "rename", icon: <EditOutlined />, label: "Rename" },
+    {
+      key: "move",
+      icon: <SwapOutlined />,
+      label: "Move to lane",
+      children: lanes
+        .filter((l) => l.id !== item.laneId)
+        .map((l) => ({ key: `move:${l.id}`, label: l.name }))
+        .concat([{ key: "move:inbox", label: "Inbox (unsorted)" }]),
+    },
+    { type: "divider" as const },
+    { key: "delete", icon: <DeleteOutlined />, label: "Delete", danger: true },
+  ];
+
+  const onMenu = ({ key }: { key: string }) => {
+    if (key === "rename") {
+      setDraft(item.label);
+      setRenaming(true);
+      return;
+    }
+    if (key === "delete") {
+      haptic("warning");
+      dispatch({ type: "DELETE_ITEM", id: item.id });
+      return;
+    }
+    if (key.startsWith("move:")) {
+      const target = key.slice(5);
+      dispatch({ type: "ASSIGN_ITEM", id: item.id, laneId: target === "inbox" ? null : target });
+      haptic("success");
+    }
+  };
+
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect();
+    }
+  };
 
   return (
-    <div ref={setNodeRef} style={style} className={`sf-card${isDragging ? " is-dragging" : ""}`}>
-      <div className="sf-card-top">
-        <span className="sf-card-grip" {...attributes} {...listeners} aria-label="Drag to reorder">
-          <HolderOutlined />
-        </span>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`sf-step${isDragging ? " is-dragging" : ""}${selected ? " is-selected" : ""}`}
+      onClick={renaming ? undefined : onSelect}
+      onKeyDown={renaming ? undefined : onKey}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+    >
+      <span className="sf-step-grip" {...attributes} {...listeners} aria-label="Drag to reorder">
+        <HolderOutlined />
+      </span>
 
-        {editing ? (
-          <Input
-            size="small"
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onPressEnter={commit}
-            onBlur={commit}
-            style={{ flex: 1 }}
-          />
-        ) : (
-          <span className="sf-card-label">{item.label}</span>
-        )}
+      <span className="sf-step-seq" aria-hidden="true">
+        {index}
+      </span>
 
-        {item.openQuestion && !editing && (
-          <Tooltip title={item.openQuestion}>
-            <QuestionCircleFilled className="sf-card-flag" aria-label="Has an open question" />
-          </Tooltip>
-        )}
-
-        <span className="sf-card-actions">
-          <Tooltip title="Rename">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => {
-                setDraft(item.label);
-                setEditing(true);
-              }}
-            />
-          </Tooltip>
-          <Tooltip title="Delete">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                haptic("warning");
-                dispatch({ type: "DELETE_ITEM", id: item.id });
-              }}
-            />
-          </Tooltip>
-        </span>
-      </div>
-
-      {/* Outside discovery this is the only place the handoffs are summarized.
-          In discovery the mechanism rows list the same targets with their
-          mechanism attached, so showing both says one thing three times. */}
-      {targets.length > 0 && !discovery && (
-        <div className="sf-conn-row">
-          <ArrowRightOutlined className="sf-conn-arrow" />
-          {targets.map((t, i) => (
-            <span key={i} className="sf-conn-arrow" style={{ color: "inherit" }}>
-              {t}
-              {i < targets.length - 1 ? "," : ""}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="sf-card-connect">
-        <ConnectionEditor
-          item={item}
-          allItems={allItems}
-          lanes={lanes}
-          dispatch={dispatch}
-          discovery={discovery}
+      {renaming ? (
+        <Input
+          size="small"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onPressEnter={commit}
+          onBlur={commit}
+          onClick={(e) => e.stopPropagation()}
+          style={{ flex: 1 }}
         />
-      </div>
-
-      {discovery && (
-        <div className="sf-card-details">
-          <button
-            type="button"
-            className="sf-details-toggle"
-            onClick={() => setDetailsOpen((o) => !o)}
-            aria-expanded={detailsOpen}
-          >
-            {detailsOpen ? <DownOutlined /> : <RightOutlined />}
-            <span>Details</span>
-            {!detailsOpen && (item.systemOfRecord || item.openQuestion) && (
-              <span className="sf-details-dot" aria-label="Has details" />
-            )}
-          </button>
-
-          {detailsOpen && (
-            <div className="sf-details-fields">
-              <label className="sf-details-field">
-                <span className="sf-details-label">Storage system</span>
-                <Input
-                  // Uncontrolled + commit-on-blur so a live typist isn't
-                  // dispatching per keystroke; keyed so template loads reseed it.
-                  key={item.systemOfRecord ?? ""}
-                  size="small"
-                  // Amber while empty, so an unfilled step is visible on the
-                  // build board instead of only in the panel.
-                  className={item.systemOfRecord ? undefined : "sf-field-unfilled"}
-                  placeholder="QuickBooks, Airtable, shared drive, nowhere"
-                  defaultValue={item.systemOfRecord ?? ""}
-                  onBlur={(e) =>
-                    dispatch({
-                      type: "SET_SYSTEM_OF_RECORD",
-                      id: item.id,
-                      systemOfRecord: e.target.value,
-                    })
-                  }
-                  onPressEnter={(e) =>
-                    dispatch({
-                      type: "SET_SYSTEM_OF_RECORD",
-                      id: item.id,
-                      systemOfRecord: (e.target as HTMLInputElement).value,
-                    })
-                  }
-                />
-              </label>
-
-              <label className="sf-details-field">
-                <span className="sf-details-label">Open question</span>
-                <Input
-                  key={item.openQuestion ?? ""}
-                  size="small"
-                  placeholder="What's unresolved on this step"
-                  defaultValue={item.openQuestion ?? ""}
-                  onBlur={(e) =>
-                    dispatch({
-                      type: "SET_OPEN_QUESTION",
-                      id: item.id,
-                      openQuestion: e.target.value,
-                    })
-                  }
-                  onPressEnter={(e) =>
-                    dispatch({
-                      type: "SET_OPEN_QUESTION",
-                      id: item.id,
-                      openQuestion: (e.target as HTMLInputElement).value,
-                    })
-                  }
-                />
-              </label>
-            </div>
-          )}
-        </div>
+      ) : (
+        <span className="sf-step-label">{item.label}</span>
       )}
+
+      {/* No tooltips on the card face. They fire on hover exactly where the
+          drawer opens, and the count and dot already read on their own. */}
+      {!renaming && handoffCount > 0 && (
+        <span
+          className="sf-step-handoffs"
+          aria-label={`Hands off to ${handoffCount} step${handoffCount === 1 ? "" : "s"}`}
+        >
+          <ArrowRightOutlined />
+          {handoffCount}
+        </span>
+      )}
+
+      {!renaming && needsDetail && (
+        <span className="sf-step-dot" aria-label="Missing detail" />
+      )}
+
+      <span className="sf-step-menu" onClick={(e) => e.stopPropagation()}>
+        <Dropdown
+          trigger={["click"]}
+          placement="bottomRight"
+          menu={{ items: menuItems, onClick: onMenu }}
+        >
+          <button type="button" className="sf-icon-btn" aria-label={`Actions for ${item.label}`}>
+            <MoreOutlined />
+          </button>
+        </Dropdown>
+      </span>
     </div>
   );
 }

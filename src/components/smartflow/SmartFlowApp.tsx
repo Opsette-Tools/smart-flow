@@ -133,7 +133,7 @@ function SmartFlow() {
         {/* Active diagram body. */}
         {activeType === "swimlane" ? (
           swimMode === "build" ? (
-            <BuildMode doc={doc} dispatch={dispatch} onViewDiagram={() => setSwimMode("diagram")} />
+            <BuildMode doc={doc} dispatch={dispatch} />
           ) : swimMode === "map" ? (
             <SchemaMapView doc={doc} dispatch={dispatch} />
           ) : (
