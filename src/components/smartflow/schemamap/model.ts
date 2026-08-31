@@ -91,6 +91,10 @@ export interface StepRow {
   systemOfRecord?: string;
   /** Discovery: an unanswered question hangs off this step. */
   openQuestion?: string;
+  /** Discovery: whose job this is. Rendered as a nested line. */
+  owner?: string;
+  /** Discovery: a department person named this step as where it breaks. */
+  breakPoint?: string;
 }
 
 export interface LaneCard {
@@ -200,8 +204,11 @@ export function buildMap(doc: SmartFlowDoc): MapModel {
 
       const system = step.systemOfRecord?.trim() || undefined;
       const question = step.openQuestion?.trim() || undefined;
-      // System of record and open question each occupy a nested line too.
-      const extraLines = (system ? 1 : 0) + (question ? 1 : 0);
+      const owner = step.owner?.trim() || undefined;
+      const breakPoint = step.breakPoint?.note.trim() || undefined;
+      // Each discovery field occupies a nested line of its own.
+      const extraLines =
+        (system ? 1 : 0) + (question ? 1 : 0) + (owner ? 1 : 0) + (breakPoint ? 1 : 0);
       const h = rowHeight(notes.length + extraLines);
 
       rows.push({
@@ -215,6 +222,8 @@ export function buildMap(doc: SmartFlowDoc): MapModel {
         notes,
         systemOfRecord: system,
         openQuestion: question,
+        owner,
+        breakPoint,
       });
       y += h;
     }

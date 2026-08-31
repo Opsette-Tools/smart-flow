@@ -81,6 +81,11 @@ export interface GapsReport {
   openQuestions: OpenQuestionFinding[];
   /** Total count of open questions across every lane. */
   openQuestionCount: number;
+  /** Steps a department person named as where the process actually breaks. */
+  breakPoints: { itemId: string; label: string; laneName: string; note: string }[];
+  /** Steps grouped by owner, in first-seen order. Unowned steps are excluded —
+   *  this counts who's on the hook, not who's missing an answer. */
+  ownerTally: { owner: string; count: number }[];
   /** How many placed steps the report covers. */
   placedCount: number;
   /** Every known mechanism rung, in ladder order, with how many answered
@@ -263,6 +268,27 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
     count: mechanismCounts.get(m.value) ?? 0,
   }));
 
+  // --- Break points: a first-person "this is where it breaks", not an
+  // inferred finding. Only placed steps count, same as everything else here.
+  const breakPoints = placed
+    .filter((i) => i.breakPoint)
+    .map((i) => ({ itemId: i.id, label: i.label, laneName: laneOf(i), note: i.breakPoint!.note }));
+
+  // --- Owner tally: case-insensitive, first-typed spelling kept, same shape
+  // as the system inventory above. Unowned steps are excluded on purpose.
+  const ownerCounts = new Map<string, { owner: string; count: number }>();
+  for (const i of placed) {
+    const raw = i.owner?.trim();
+    if (!raw) continue;
+    const key = raw.toLowerCase();
+    const found = ownerCounts.get(key);
+    if (found) found.count += 1;
+    else ownerCounts.set(key, { owner: raw, count: 1 });
+  }
+  const ownerTally = [...ownerCounts.values()].sort(
+    (a, b) => b.count - a.count || a.owner.localeCompare(b.owner),
+  );
+
   return {
     orphans,
     laneEdges,
@@ -274,6 +300,8 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
     systemInventory,
     openQuestions,
     openQuestionCount: openQuestions.reduce((n, g) => n + g.items.length, 0),
+    breakPoints,
+    ownerTally,
     placedCount: placed.length,
     mechanismTally,
     customMechanismCount,

@@ -181,6 +181,30 @@ Nothing keeps a record of these steps.
         ),
     },
     {
+      key: "break-points",
+      label: head("Break points", gaps.breakPoints.length, "finding"),
+      children:
+        gaps.breakPoints.length === 0 ? (
+          <Text type="secondary">
+No step has been flagged as a break point yet.
+          </Text>
+        ) : (
+          <>
+            <Text type="secondary" className="sf-gap-intro">
+Steps a department person pointed to as where it actually breaks.
+            </Text>
+            <ul className="sf-gap-list">
+              {gaps.breakPoints.map((b) => (
+                <Finding
+                  key={b.itemId}
+                  sentence={`${b.label} in ${b.laneName} — ${b.note}`}
+                />
+              ))}
+            </ul>
+          </>
+        ),
+    },
+    {
       key: "systems",
       label: head("Systems in use", gaps.systemInventory.length),
       children:

@@ -24,6 +24,7 @@ import {
   AimOutlined,
   DownloadOutlined,
   UndoOutlined,
+  WarningFilled,
   ZoomInOutlined,
   ZoomOutOutlined,
 } from "@ant-design/icons";
@@ -578,9 +579,22 @@ function LaneCardView({ card, x, y, focused, connected, dimmed }: CardProps) {
               </div>
             ))}
 
+            {row.owner && (
+              <div className="sf-map-note is-owner" style={{ height: ROW_NOTE_H }}>
+                <span className="sf-map-note-method">{row.owner}</span>
+              </div>
+            )}
+
             {row.systemOfRecord && (
               <div className="sf-map-note is-system" style={{ height: ROW_NOTE_H }}>
                 <span className="sf-map-note-method">{row.systemOfRecord}</span>
+              </div>
+            )}
+
+            {row.breakPoint && (
+              <div className="sf-map-note is-break" style={{ height: ROW_NOTE_H }}>
+                <WarningFilled className="sf-map-note-icon" />
+                <span className="sf-map-note-method">{row.breakPoint}</span>
               </div>
             )}
 

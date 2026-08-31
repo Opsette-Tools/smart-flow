@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type KeyboardEvent } from "react";
-import { Dropdown, Input } from "antd";
+import { Dropdown, Input, Tooltip } from "antd";
 import {
   HolderOutlined,
   MoreOutlined,
@@ -7,6 +7,9 @@ import {
   DeleteOutlined,
   SwapOutlined,
   ArrowRightOutlined,
+  CheckCircleOutlined,
+  WarningFilled,
+  UserOutlined,
 } from "@ant-design/icons";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -151,6 +154,28 @@ export function LaneItemCard({
           <ArrowRightOutlined />
           {handoffCount}
         </span>
+      )}
+
+      {!renaming && item.owner && (
+        <Tooltip title={`Owner: ${item.owner}`}>
+          <span className="sf-step-owner" aria-label={`Owner: ${item.owner}`}>
+            <UserOutlined />
+          </span>
+        </Tooltip>
+      )}
+
+      {!renaming && item.validated && (
+        <span className="sf-step-validated" aria-label="Validated">
+          <CheckCircleOutlined />
+        </span>
+      )}
+
+      {!renaming && item.breakPoint && (
+        <Tooltip title={item.breakPoint.note}>
+          <span className="sf-step-break" aria-label={`Break point: ${item.breakPoint.note}`}>
+            <WarningFilled />
+          </span>
+        </Tooltip>
       )}
 
       {!renaming && needsDetail && (

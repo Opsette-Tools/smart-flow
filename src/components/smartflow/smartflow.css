@@ -499,6 +499,35 @@ html.dark .sf-step-handoffs {
   border-radius: 50%;
   background: var(--ops-gold);
 }
+/* A department person named this step as where it breaks — a real warning
+   icon, not an abstract dot, so its meaning doesn't depend on a legend. */
+.sf-step-break {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--ops-gold);
+  font-size: var(--ops-fs-fine);
+}
+/* Small green check: the step has been validated. */
+.sf-step-validated {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--ops-green-light);
+  font-size: var(--ops-fs-fine);
+}
+html.dark .sf-step-validated {
+  color: var(--ops-green-light);
+}
+/* Muted person glyph: who owns this step. Neutral tone — not a finding,
+   just an identity fact, so it doesn't compete with the warning/check dots. */
+.sf-step-owner {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: #8a8a8a;
+  font-size: var(--ops-fs-fine);
+}
+html.dark .sf-step-owner {
+  color: #9d9b93;
+}
 .sf-step-menu {
   flex: 0 0 auto;
   display: inline-flex;
@@ -1176,6 +1205,7 @@ html.dark .sf-map-step {
 
 /* An unanswered question hangs off this step. */
 .sf-map-flag {
+  display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -1220,10 +1250,28 @@ html.dark .sf-map-note.is-manual .sf-map-note-method {
 .sf-map-note.is-system .sf-map-note-method {
   font-style: italic;
 }
+.sf-map-note.is-owner .sf-map-note-method {
+  opacity: 0.75;
+}
 .sf-map-note.is-question .sf-map-note-method {
   color: var(--sf-map-q, #9a7d1f);
 }
 html.dark .sf-map-note.is-question .sf-map-note-method {
+  --sf-map-q: #c9a227;
+}
+.sf-map-note.is-break .sf-map-note-method {
+  color: var(--sf-map-q, #9a7d1f);
+  font-weight: 600;
+}
+html.dark .sf-map-note.is-break .sf-map-note-method {
+  --sf-map-q: #c9a227;
+}
+.sf-map-note-icon {
+  flex-shrink: 0;
+  color: var(--sf-map-q, #9a7d1f);
+  font-size: 10px;
+}
+html.dark .sf-map-note-icon {
   --sf-map-q: #c9a227;
 }
 
@@ -1381,15 +1429,32 @@ html.dark .sf-panel-foot {
    the block's own top margin below, never from the label, so a label can never
    drift halfway between two fields. */
 .sf-field-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 var(--ops-space-sm);
   font-size: var(--ops-fs-caption);
   font-weight: 600;
+}
+.sf-field-title .anticon {
+  color: var(--ops-green-light);
+  font-size: 0.95em;
 }
 /* Any labelled block that follows something inside the same group gets real
    separation, so an input never sits flush on the field above it. */
 .sf-field-group > * + .sf-field-title,
 .sf-field-group > * + .sf-mech-list {
   margin-top: var(--ops-space-xl);
+}
+/* A toggle field: label and switch on one line, no stacked label beneath. */
+.sf-field-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+}
+.sf-field-toggle-row .sf-field-title {
+  margin: 0;
 }
 
 /* ---- ResizableDrawer chrome ---------------------------------------------- */

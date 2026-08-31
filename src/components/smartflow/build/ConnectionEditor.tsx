@@ -1,5 +1,6 @@
 import { type Dispatch } from "react";
 import { Input, Select } from "antd";
+import { DragOutlined } from "@ant-design/icons";
 import type { Action } from "../store";
 import {
   MECHANISMS,
@@ -116,7 +117,7 @@ export function ConnectionEditor({ item, allItems, lanes, dispatch }: Props) {
 
       {item.connectsTo.length > 0 && (
         <div className="sf-mech-list">
-          <h4 className="sf-field-title">Handoff method</h4>
+          <h4 className="sf-field-title"><DragOutlined /> Handoff method</h4>
           {item.connectsTo.map((toId) => {
             const detail = detailFor(toId);
             const picked = connectionMechanisms(detail);

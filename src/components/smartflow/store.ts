@@ -154,6 +154,9 @@ export type Action =
   | { type: "SET_SYSTEM_NAME"; id: string; toId: string; systemName: string }
   | { type: "SET_SYSTEM_OF_RECORD"; id: string; systemOfRecord: string }
   | { type: "SET_OPEN_QUESTION"; id: string; openQuestion: string }
+  | { type: "SET_OWNER"; id: string; owner: string }
+  | { type: "SET_BREAK_POINT"; id: string; breakPoint?: { note: string } }
+  | { type: "SET_VALIDATED"; id: string; validated: boolean }
   | { type: "RESET" }
   | { type: "REPLACE_DOC"; doc: SmartFlowDoc };
 
@@ -355,6 +358,37 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
         ...doc,
         items: doc.items.map((i) =>
           i.id === action.id ? { ...i, openQuestion: value || undefined } : i,
+        ),
+      };
+    }
+
+    case "SET_OWNER": {
+      const value = action.owner.trim();
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id ? { ...i, owner: value || undefined } : i,
+        ),
+      };
+    }
+
+    case "SET_BREAK_POINT": {
+      const note = action.breakPoint?.note.trim();
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id
+            ? { ...i, breakPoint: note ? { note } : undefined }
+            : i,
+        ),
+      };
+    }
+
+    case "SET_VALIDATED": {
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id ? { ...i, validated: action.validated || undefined } : i,
         ),
       };
     }

@@ -137,6 +137,14 @@ export interface Item {
   systemOfRecord?: string;
   /** Discovery: what you couldn't answer in the room. */
   openQuestion?: string;
+  /** Discovery: whose job this is, in the department's own words. */
+  owner?: string;
+  /** Discovery: a department person named this step as where things break down.
+   *  Presence of the object means "flagged"; the note holds what they said. */
+  breakPoint?: { note: string };
+  /** Discovery: you've verified this step is accurate — as opposed to your
+   *  best read from the interview, not yet checked. */
+  validated?: boolean;
 }
 
 /** Every mechanism on a connection, single or compound, in pick order. The one
