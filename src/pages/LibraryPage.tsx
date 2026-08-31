@@ -1,12 +1,20 @@
 import { useState } from "react";
 import { Button, Dropdown, Empty, Input, List, Modal, Tag, Typography, message } from "antd";
-import { CopyOutlined, DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  CopyOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  ExportOutlined,
+  MoreOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 import { diagramInfo } from "@/components/smartflow/diagramTypes";
 import { flowsRepo } from "@/db/flowsRepo";
 import type { Flow } from "@/db/types";
 import { useCreateFlow } from "@/lib/useCreateFlow";
 import { useFlows } from "@/layout/FlowsContext";
 import { ChooserModal } from "@/components/smartflow/ChooserModal";
+import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
 
@@ -25,7 +33,8 @@ function formatUpdated(ts: number): string {
 
 /**
  * "Library" — every saved diagram, across all five types, with the actions
- * that operate on the library itself (new / rename / duplicate / delete).
+ * that operate on the library itself (new / rename / duplicate / export /
+ * delete).
  * The sidebar (layout/FlowSidebar) is for quick switching and has no
  * buttons of its own; this page is where the actual management happens.
  */
@@ -46,6 +55,14 @@ export default function LibraryPage() {
     setChooserOpen(false);
     await createFromTemplate(template);
     refresh();
+  };
+
+  // The same single-flow JSON the flow page's own menu writes. The library is
+  // where flows are managed, so it is the first place someone looks to get one
+  // out of the browser.
+  const handleExport = (flow: Flow) => {
+    const json = serializeFlowExport(flow);
+    triggerDownload(new Blob([json], { type: "application/json" }), flowExportFileName(flow.name));
   };
 
   const handleDuplicate = async (flow: Flow) => {
@@ -110,12 +127,14 @@ export default function LibraryPage() {
                     items: [
                       { key: "rename", label: "Rename", icon: <EditOutlined /> },
                       { key: "duplicate", label: "Duplicate", icon: <CopyOutlined /> },
+                      { key: "export", label: "Export", icon: <ExportOutlined /> },
                       { key: "delete", label: "Delete", icon: <DeleteOutlined />, danger: true },
                     ],
                     onClick: ({ key, domEvent }) => {
                       domEvent.stopPropagation();
                       if (key === "rename") openRename(flow);
                       if (key === "duplicate") handleDuplicate(flow);
+                      if (key === "export") handleExport(flow);
                       if (key === "delete") handleDelete(flow);
                     },
                   }}

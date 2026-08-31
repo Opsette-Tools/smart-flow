@@ -21,18 +21,13 @@ export function StepDetailFields({ item, allItems, lanes, dispatch }: Props) {
   return (
     <>
       <section className="sf-field-group">
-        <h4 className="sf-field-title">This step hands off to</h4>
-        <ConnectionEditor item={item} allItems={allItems} lanes={lanes} dispatch={dispatch} />
-      </section>
-
-      <section className="sf-field-group">
         <h4 className="sf-field-title">System of record</h4>
         <Input
           // Uncontrolled + commit on blur so a live typist isn't dispatching
           // per keystroke. Keyed so template loads reseed it.
           key={`sor-${item.id}-${item.systemOfRecord ?? ""}`}
           className={item.systemOfRecord ? undefined : "sf-field-unfilled"}
-          placeholder="QuickBooks, Airtable, shared drive, nowhere"
+          placeholder="QuickBooks, Airtable, shared drive"
           defaultValue={item.systemOfRecord ?? ""}
           onBlur={(e) =>
             dispatch({
@@ -49,6 +44,11 @@ export function StepDetailFields({ item, allItems, lanes, dispatch }: Props) {
             })
           }
         />
+      </section>
+
+      <section className="sf-field-group">
+        <h4 className="sf-field-title">This step hands off to</h4>
+        <ConnectionEditor item={item} allItems={allItems} lanes={lanes} dispatch={dispatch} />
       </section>
 
       <section className="sf-field-group">

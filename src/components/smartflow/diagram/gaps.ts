@@ -15,7 +15,9 @@ import {
   connectionMechanisms,
   isCustomMechanism,
   isManualMechanism,
+  mechanismLabel,
   mechanismListLabel,
+  MECHANISMS,
   type HandoffMechanism,
   type Item,
   type KnownMechanism,
@@ -81,6 +83,12 @@ export interface GapsReport {
   openQuestionCount: number;
   /** How many placed steps the report covers. */
   placedCount: number;
+  /** Every known mechanism rung, in ladder order, with how many answered
+   *  handoffs use it as their primary mechanism. Custom answers are tallied
+   *  separately since they don't fit a rung. */
+  mechanismTally: { mechanism: KnownMechanism; label: string; count: number }[];
+  /** Answered handoffs whose primary mechanism was a custom, typed-in answer. */
+  customMechanismCount: number;
 }
 
 const INBOX_LANE = "Inbox";
@@ -237,6 +245,24 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
     }))
     .filter((g) => g.items.length > 0);
 
+  // --- Mechanism tally: how each answered handoff's primary rung is used.
+  // Ladder order (not count order) so the chart reads as the maturity ladder
+  // it is — a bar that jumps around by frequency would hide the story.
+  const mechanismCounts = new Map<KnownMechanism, number>();
+  let customMechanismCount = 0;
+  for (const h of answeredHandoffs) {
+    if (isCustomMechanism(h.mechanism)) {
+      customMechanismCount += 1;
+    } else {
+      mechanismCounts.set(h.mechanism, (mechanismCounts.get(h.mechanism) ?? 0) + 1);
+    }
+  }
+  const mechanismTally = MECHANISMS.map((m) => ({
+    mechanism: m.value,
+    label: mechanismLabel(m.value),
+    count: mechanismCounts.get(m.value) ?? 0,
+  }));
+
   return {
     orphans,
     laneEdges,
@@ -249,6 +275,8 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
     openQuestions,
     openQuestionCount: openQuestions.reduce((n, g) => n + g.items.length, 0),
     placedCount: placed.length,
+    mechanismTally,
+    customMechanismCount,
   };
 }
 

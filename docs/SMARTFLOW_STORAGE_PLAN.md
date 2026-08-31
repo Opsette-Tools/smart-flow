@@ -276,3 +276,73 @@ run has not happened. Do that before treating this as closed.
   top of the same code if wanted later.
 - `PrivacyModal.tsx` still says "browser's local storage" — colloquially
   fine, technically IndexedDB now. Never asked to fix, left as-is.
+
+---
+
+## 8. Phase 2 decisions settled 2026-08-31 (read before building)
+
+§5 stands as written. These are the answers to the questions §5 leaves open,
+plus two corrections found by reading the shipped code.
+
+### 8.1 The parent app needs no per-tool work
+
+The bridge protocol is generic: `data_id` plus an opaque `value`. The database
+schema does not change per tool, and the parent never needs to know what a Flow
+is. The only parent-side action is flipping SmartFlow's app entry to
+**`storage_scope: 'shared'`** (see `_shared/opsette-bridge/INTEGRATION.md`).
+Nothing has to be prepared in advance, per tool or per stored shape.
+
+### 8.2 Existing IndexedDB flows: do NOT auto-migrate
+
+The open question was what happens to local flows the first time the bridge
+connects. **Answer: leave them alone.** Export/import already moves a flow
+between stores, so a user can lift exactly the flows they want into Opsette and
+leave the rest local. An automatic upward migration would push private scratch
+boards into a shared database without being asked, and it cannot be undone from
+inside the tool.
+
+Consequence for §5 step 4: on first embed the parent is authoritative for what
+it sends, but local-only rows are not deleted and not uploaded. They stay in the
+standalone library.
+
+### 8.3 Autosave must slow down when bridged
+
+Correction to an assumption: autosave was never disabled. `FlowPage` debounces
+at **300ms** for both the swimlane doc and outline text, guarded by
+`loadedIdRef` so a half-loaded flow cannot clobber a real one.
+
+300ms against IndexedDB is free. 300ms against `postMessage` to a parent that
+writes to a database is a request every 300ms while someone types. **Raise the
+debounce when `isBridgeMode()`** (1500ms is a reasonable starting point) and
+flush on unmount and on navigation away, so nothing is lost between saves.
+
+### 8.4 Export discoverability, fixed 2026-08-31
+
+The JSON export existed only in the FlowPage top-bar kebab. Ruthnie looked in
+the Library kebab first, which had rename / duplicate / delete and no export.
+Since export/import IS the migration path in §8.2, a hard-to-find export made
+that answer unusable. Export is now in the Library kebab too, same
+`serializeFlowExport` and same file name helper.
+
+Labels were deliberately left alone: "Export" sits near "Export PNG" and "Save
+as PDF" on the flow page, and renaming them was considered and rejected.
+
+### 8.5 The share link is shelved, not deleted
+
+`SHARE_LINK_PLAN.md` stays on disk for its size measurements and its
+never-throw decode discipline, both still useful if an offline-shareable
+artifact is ever wanted. It is not being built. Once flows live in the parent's
+database, a public share route there does the same job better: live rather than
+a snapshot, and revocable, which a URL-encoded link can never be.
+
+The three honest sharing answers are: keep it local, hand someone the JSON
+file, or share in place through Opsette.
+
+### 8.6 What the bridge does and does not buy
+
+Worth stating so the next session does not overpromise it. The bridge gives
+durable cross-device storage for the person using the tool. It does **not** make
+sharing live, and it does not by itself let anyone else see a flow: an embedded
+tool still requires an Opsette session. Public sharing is a parent-app project
+(a token, a read-only route, an audience model) that reads the same shared rows.
+The bridge is its prerequisite, not its delivery.

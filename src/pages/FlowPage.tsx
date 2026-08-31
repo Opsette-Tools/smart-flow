@@ -4,6 +4,7 @@ import { Button, Dropdown, Input, Modal, Segmented, Spin, Typography } from "ant
 import {
   AppstoreOutlined,
   ApartmentOutlined,
+  BarChartOutlined,
   FileTextOutlined,
   MoreOutlined,
   EditOutlined,
@@ -13,6 +14,7 @@ import {
 } from "@ant-design/icons";
 import { reducer, emptyDoc } from "@/components/smartflow/store";
 import { BuildMode } from "@/components/smartflow/build/BuildMode";
+import { ChartsPanel } from "@/components/smartflow/diagram/ChartsPanel";
 import { DiagramView } from "@/components/smartflow/diagram/DiagramView";
 import { SchemaMapView } from "@/components/smartflow/schemamap/SchemaMapView";
 import { OutlineBuilder } from "@/components/smartflow/OutlineBuilder";
@@ -24,7 +26,7 @@ import { useFlows } from "@/layout/FlowsContext";
 import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
-type SwimMode = "build" | "diagram" | "map";
+type SwimMode = "build" | "diagram" | "charts" | "map";
 
 /**
  * One saved flow's workspace, loaded by route id. Rename/duplicate/delete
@@ -196,6 +198,7 @@ export default function FlowPage() {
             options={[
               { label: "Build", value: "build", icon: <AppstoreOutlined /> },
               { label: "Summary", value: "diagram", icon: <FileTextOutlined /> },
+              { label: "Charts", value: "charts", icon: <BarChartOutlined /> },
               { label: "Map", value: "map", icon: <ApartmentOutlined /> },
             ]}
           />
@@ -207,6 +210,8 @@ export default function FlowPage() {
           <BuildMode doc={doc} dispatch={dispatch} />
         ) : swimMode === "map" ? (
           <SchemaMapView doc={doc} dispatch={dispatch} />
+        ) : swimMode === "charts" ? (
+          <ChartsPanel doc={doc} />
         ) : (
           <DiagramView doc={doc} dispatch={dispatch} />
         )

@@ -701,6 +701,79 @@ html.dark .sf-mech-unset {
   width: 100%;
 }
 
+/* ---- Charts panel --------------------------------------------------------
+   Chart colors are hardcoded in ChartsPanel.tsx (an ordinal ramp validated
+   against both surfaces via the dataviz skill) since recharts needs real hex,
+   not CSS vars, for its fills. These vars cover the chart chrome only —
+   axis lines and the tooltip — which recharts CAN take as var() strings. */
+.sf-charts {
+  margin-top: var(--ops-space-xl);
+  max-width: var(--ops-page-max);
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: var(--ops-page-pad);
+  --sf-chart-axis: #b0b0ac;
+  --sf-chart-cursor: rgba(47, 79, 70, 0.06);
+  --sf-chart-tooltip-bg: #fff;
+  --sf-chart-tooltip-border: #e0e0e0;
+}
+html.dark .sf-charts {
+  --sf-chart-axis: #6b6b66;
+  --sf-chart-cursor: rgba(228, 196, 154, 0.08);
+  --sf-chart-tooltip-bg: #1f1f1e;
+  --sf-chart-tooltip-border: #3a3a38;
+}
+.sf-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--ops-space-lg);
+  margin-bottom: var(--ops-space-xl);
+}
+.sf-stat-card {
+  padding: var(--ops-space-sm) var(--ops-space-md);
+  background: var(--sf-card-bg, #fff);
+  border: 1px solid var(--sf-border, #e6e6e2);
+  border-radius: var(--ops-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.sf-stat-card .ant-statistic-title {
+  font-size: var(--ops-fs-fine);
+  margin-bottom: 0;
+}
+.sf-stat-card .ant-statistic-content-value {
+  color: var(--ops-green);
+  font-weight: 600;
+}
+html.dark .sf-stat-card {
+  --sf-border: #3a3a38;
+  --sf-card-bg: #262625;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+html.dark .sf-stat-card .ant-statistic-content-value {
+  color: #8fb8a9;
+}
+.sf-chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ops-space-xl);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .sf-chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+.sf-chart-block {
+  margin-bottom: var(--ops-space-xl);
+  min-width: 0;
+}
+.sf-chart-head {
+  margin-bottom: var(--ops-space-sm);
+}
+.sf-chart-title {
+  font-size: var(--ops-fs-sub);
+}
+
 /* ---- Gaps panel --------------------------------------------------------- */
 .sf-gaps {
   margin-top: var(--ops-space-xl);
