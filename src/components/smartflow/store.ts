@@ -3,7 +3,8 @@
  *
  * One reducer owns the whole SmartFlowDoc; every build-mode action funnels
  * through here so the components stay thin and the mutation rules live in one
- * place. localStorage helpers (load / save / clear) sit alongside it.
+ * place. Persistence (which flow this doc belongs to, and saving it) lives in
+ * db/flowsRepo.ts — this file only holds the shape and its mutations.
  *
  * Ordering convention: `order` is a dense 0..n-1 sequence within each scope
  * (lanes left-to-right, items within a lane top-to-bottom). After any structural
@@ -11,12 +12,10 @@
  * the diagram layout deterministic.
  */
 
-import type { CardPosition, Connection, HandoffMechanism, Item, Lane, PersistedDoc, SmartFlowDoc } from "./types";
+import type { Connection, HandoffMechanism, Item, Lane, SmartFlowDoc } from "./types";
 import { connectionMechanisms } from "./types";
 import { uuid } from "@/lib/uuid";
 import { leadToClientDoc } from "./templates";
-
-const STORAGE_KEY = "smart-flow-doc";
 
 // ---------------------------------------------------------------------------
 // Initial / seed
@@ -31,81 +30,6 @@ export const emptyDoc: SmartFlowDoc = { lanes: [], items: [] };
  */
 export function seedDoc(): SmartFlowDoc {
   return leadToClientDoc();
-}
-
-// ---------------------------------------------------------------------------
-// localStorage
-// ---------------------------------------------------------------------------
-
-/** Validate persisted schema-map positions. A NaN or a non-numeric entry would
- *  strand a card at an unreachable coordinate, so bad entries are dropped
- *  rather than trusted — the card falls back to its computed grid slot. */
-function readPositions(raw: unknown): Record<string, CardPosition> | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const out: Record<string, CardPosition> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (!value || typeof value !== "object") continue;
-    const { x, y } = value as { x?: unknown; y?: unknown };
-    if (typeof x !== "number" || typeof y !== "number") continue;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    out[key] = { x, y };
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
-/** Read the saved doc. Returns null when nothing valid is stored. */
-export function loadDoc(): SmartFlowDoc | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<PersistedDoc>;
-    if ((parsed?.v !== 1 && parsed?.v !== 2) || !parsed.doc) return null;
-    const doc = parsed.doc;
-    if (!Array.isArray(doc.lanes) || !Array.isArray(doc.items)) return null;
-    // v1 -> v2 is a no-op read: every added field is optional, so a v1 doc
-    // loads untouched. All this does is re-assert the invariants.
-    return {
-      lanes: doc.lanes,
-      items: doc.items.map((i) => ({
-        ...i,
-        connectsTo: Array.isArray(i.connectsTo) ? i.connectsTo : [],
-        connections: Array.isArray(i.connections) ? i.connections : undefined,
-      })),
-      summary: typeof doc.summary === "string" ? doc.summary : undefined,
-      lanePositions: readPositions(doc.lanePositions),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** Write the doc (versioned). Silently ignores quota / private-mode errors. */
-export function saveDoc(doc: SmartFlowDoc): void {
-  if (typeof window === "undefined") return;
-  try {
-    const payload: PersistedDoc = { v: 2, doc };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    /* storage full or unavailable — non-fatal */
-  }
-}
-
-/** Remove the persisted doc (used by Start over). */
-export function clearDoc(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* non-fatal */
-  }
-}
-
-/** Lazy initializer: saved doc if present, else a clean empty board. The
- *  seeded example (seedDoc) is offered via a "load example" affordance instead
- *  of force-filling a first-time user's canvas. */
-export function initDoc(): SmartFlowDoc {
-  return loadDoc() ?? emptyDoc;
 }
 
 // ---------------------------------------------------------------------------

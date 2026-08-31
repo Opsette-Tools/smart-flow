@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { Action } from "../store";
-import { clearDoc, seedDoc } from "../store";
+import { seedDoc } from "../store";
 import type { Item, SmartFlowDoc } from "../types";
 import { haptic } from "@/lib/haptics";
 import { parseScopeId } from "./dndScope";
@@ -158,7 +158,6 @@ export function BuildMode({ doc, dispatch }: Props) {
       cancelText: "Cancel",
       onOk: () => {
         haptic("warning");
-        clearDoc();
         dispatch({ type: "RESET" });
       },
     });

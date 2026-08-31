@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>SmartFlow — Opsette</title>
+    <script>
+      // GitHub Pages serves this for any unknown path (e.g. a refresh on
+      // /smart-flow/library or a shared /smart-flow/flow/:id link) since it
+      // only understands static files. Encode the real path into a query
+      // string and redirect to the app shell, which decodes it back before
+      // the router mounts (see src/main.tsx's decodeSpaRedirect). Standard
+      // rafgraph/spa-github-pages pattern.
+      var l = window.location;
+      l.replace(
+        l.protocol + "//" + l.hostname + (l.port ? ":" + l.port : "") +
+        "/smart-flow/?/" +
+        l.pathname.slice("/smart-flow/".length).replace(/&/g, "~and~") +
+        (l.search ? "&" + l.search.slice(1).replace(/&/g, "~and~") : "") +
+        l.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

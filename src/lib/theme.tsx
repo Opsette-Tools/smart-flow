@@ -71,6 +71,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
               optionSelectedBg: mode === "dark" ? "rgba(228,196,154,0.16)" : "rgba(47,79,70,0.08)",
               optionSelectedColor: mode === "dark" ? "#E4C49A" : "#2f4f46",
             },
+            // Sidebar nav (FlowSidebar): same soft brand tint as Select above.
+            // Without this, AntD's own computed selection color renders as a
+            // flat, muddy gray-olive block instead of a light brand highlight.
+            Menu: {
+              itemSelectedBg: mode === "dark" ? "rgba(228,196,154,0.16)" : "rgba(47,79,70,0.08)",
+              itemSelectedColor: mode === "dark" ? "#E4C49A" : "#2f4f46",
+              itemHoverBg: mode === "dark" ? "rgba(228,196,154,0.08)" : "rgba(47,79,70,0.04)",
+            },
           },
         }}
       >

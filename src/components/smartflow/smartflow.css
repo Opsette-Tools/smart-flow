@@ -54,6 +54,18 @@
   }
 }
 
+/* Library head: label on the left, "New flow" pinned right. Unlike .sf-topbar
+   there's no centered control to protect, so a plain flex row (not the
+   3-column grid) is the right layout here. */
+.sf-library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
 /* Chooser modal options */
 .sf-chooser-option {
   display: flex;
