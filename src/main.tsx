@@ -1,7 +1,12 @@
 import { createRoot } from "react-dom/client";
+import { message } from "antd";
 import { App } from "./App";
+import { connectBridge } from "./components/opsette-bridge";
+import { hydrateFromBridge } from "./db/flowsRepo";
 import { migrateLegacyIfNeeded } from "./db/migrateLegacy";
+import type { BridgedFlowValue } from "./db/types";
 import { setActiveFlowId } from "./lib/activeFlow";
+import { setBridgeInstance } from "./lib/bridgeInstance";
 import "reactflow/dist/style.css";
 import "./styles/tokens.css";
 import "./components/smartflow/smartflow.css";
@@ -56,18 +61,42 @@ if (isPreviewHost || isInIframe) {
     });
 }
 
-// Bring forward any pre-library single-slot doc/text before the app ever
-// renders, so the first paint already reflects the migrated flow library.
-// Never let a migration failure (IndexedDB blocked, private browsing, quota)
-// stop the app from rendering at all — the legacy localStorage key is never
-// deleted by the migration either way, so the source data survives a failed
-// attempt; only the render itself must not be allowed to block on it.
-migrateLegacyIfNeeded()
-  .catch((err) => {
+// Bridge handshake gate. In standalone (window.parent === window) this
+// resolves to null in <1ms; inside an iframe it awaits the parent's `init`
+// for up to 1s — render is never blocked past that. When bridge-mode boots,
+// hydrate IDB from init.items BEFORE rendering so flowsRepo returns the
+// right data on first render. Local-only rows are left untouched either way
+// (see hydrateFromBridge / SMARTFLOW_STORAGE_PLAN.md §8.2).
+connectBridge<BridgedFlowValue>().then(async (bridge) => {
+  setBridgeInstance(bridge);
+  if (bridge) {
+    // Debounced toast: multiple timeouts in a 1s window collapse to a single
+    // message, so a bulk-save failure doesn't spam.
+    let lastToastAt = 0;
+    bridge.onTimeout(() => {
+      const nowMs = Date.now();
+      if (nowMs - lastToastAt < 1000) return;
+      lastToastAt = nowMs;
+      message.error("Couldn't save — try again");
+    });
+    try {
+      await hydrateFromBridge(bridge.init.items);
+    } catch (err) {
+      console.error("[smart-flow] hydrateFromBridge failed:", err);
+    }
+  }
+
+  // Bring forward any pre-library single-slot doc/text (standalone-only —
+  // this browser's own localStorage, untouched by the bridge either way).
+  // Never let a migration failure (IndexedDB blocked, private browsing,
+  // quota) stop the app from rendering — the legacy key is never deleted by
+  // the migration either way, so the source data survives a failed attempt;
+  // only the render itself must not be allowed to block on it.
+  const activeId = await migrateLegacyIfNeeded().catch((err) => {
     console.error("[smart-flow] migration failed, continuing without it:", err);
     return null;
-  })
-  .then((activeId) => {
-    if (activeId) setActiveFlowId(activeId);
-    createRoot(document.getElementById("root")!).render(<App />);
   });
+  if (activeId) setActiveFlowId(activeId);
+
+  createRoot(document.getElementById("root")!).render(<App />);
+});

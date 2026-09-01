@@ -22,11 +22,18 @@ import type { SmartFlowDoc } from "@/components/smartflow/types";
 import { flowsRepo } from "@/db/flowsRepo";
 import type { Flow } from "@/db/types";
 import { setActiveFlowId } from "@/lib/activeFlow";
+import { isBridgeMode } from "@/lib/bridgeInstance";
 import { useFlows } from "@/layout/FlowsContext";
 import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
 type SwimMode = "build" | "diagram" | "charts" | "map";
+
+// Free against local IndexedDB; a request to a parent that writes to a real
+// database on every keystroke is not. Bumped when bridged — see
+// docs/SMARTFLOW_STORAGE_PLAN.md §8.3.
+const AUTOSAVE_DEBOUNCE_STANDALONE_MS = 300;
+const AUTOSAVE_DEBOUNCE_BRIDGED_MS = 1500;
 
 /**
  * One saved flow's workspace, loaded by route id. Rename/duplicate/delete
@@ -49,6 +56,11 @@ export default function FlowPage() {
   // Guards autosave from firing on the previous flow's leftover state while
   // the new id's row is still loading.
   const loadedIdRef = useRef<string | null>(null);
+  // Mirrors the latest doc/outlineText/flow so the unmount-flush effect below
+  // (which must run only once, on true unmount) can read current values
+  // without depending on them and re-firing on every keystroke.
+  const latestRef = useRef({ flow, doc, outlineText });
+  latestRef.current = { flow, doc, outlineText };
 
   useEffect(() => {
     let cancelled = false;
@@ -74,31 +86,54 @@ export default function FlowPage() {
     };
   }, [id]);
 
-  // Autosave, swimlane doc. Debounced 300ms. Skipped until this flow's own
-  // row has loaded so the reducer's initial emptyDoc can never clobber a
-  // real saved board mid-navigation.
+  // Autosave, swimlane doc. Skipped until this flow's own row has loaded so
+  // the reducer's initial emptyDoc can never clobber a real saved board
+  // mid-navigation. Standard debounce: a superseded timer is cleared, not
+  // fired early — the flush-on-unmount effect below covers the case where
+  // the page leaves before the timer would have fired.
   useEffect(() => {
     if (!flow || flow.type !== "swimlane" || loadedIdRef.current !== flow.id) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    const debounceMs = isBridgeMode() ? AUTOSAVE_DEBOUNCE_BRIDGED_MS : AUTOSAVE_DEBOUNCE_STANDALONE_MS;
     saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = undefined;
       flowsRepo.updateContent(flow.id, doc);
-    }, 300);
+    }, debounceMs);
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
   }, [doc, flow]);
 
-  // Autosave, outline text — same debounce, the other content shape.
+  // Autosave, outline text — same shape, the other content type.
   useEffect(() => {
     if (!flow || flow.type === "swimlane" || loadedIdRef.current !== flow.id) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    const debounceMs = isBridgeMode() ? AUTOSAVE_DEBOUNCE_BRIDGED_MS : AUTOSAVE_DEBOUNCE_STANDALONE_MS;
     saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = undefined;
       flowsRepo.updateContent(flow.id, outlineText);
-    }, 300);
+    }, debounceMs);
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
   }, [outlineText, flow]);
+
+  // Flush whatever's pending when the flow being viewed changes (route
+  // navigation to a different id) or the page truly unmounts, so a change
+  // made just before leaving isn't lost to a debounce timer that never got
+  // to fire. Reads latestRef rather than depending on doc/outlineText/flow
+  // directly so this effect runs only on those two transitions, not on
+  // every keystroke.
+  useEffect(() => {
+    return () => {
+      if (!saveTimer.current) return;
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = undefined;
+      const { flow: f, doc: d, outlineText: t } = latestRef.current;
+      if (!f || loadedIdRef.current !== f.id) return;
+      flowsRepo.updateContent(f.id, f.type === "swimlane" ? d : t);
+    };
+  }, [id]);
 
   const openRename = () => {
     if (!flow) return;

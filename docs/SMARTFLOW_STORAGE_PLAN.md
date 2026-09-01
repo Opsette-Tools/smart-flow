@@ -2,7 +2,9 @@
 
 **Status:** Phase 1 (flow library) built and shipped 2026-08-31, plus real
 routing and export/import that weren't in the original plan. Phase 2 (the
-Opsette bridge, §5) is **not started** — still just this plan.
+Opsette bridge, §5) **built 2026-09-01** — code complete, typechecks clean,
+not yet verified in the running app. See §9 for what actually shipped and
+one real deviation from §5's literal wording, found while building.
 **Author's note:** written as a build brief, researched against the family's
 proven patterns before any code changes. Section 6 is the build order.
 See §7 for the 2026-08-31 completion notes — the actual delivery diverged
@@ -346,3 +348,63 @@ sharing live, and it does not by itself let anyone else see a flow: an embedded
 tool still requires an Opsette session. Public sharing is a parent-app project
 (a token, a read-only route, an audience model) that reads the same shared rows.
 The bridge is its prerequisite, not its delivery.
+
+---
+
+## 9. Phase 2 build notes — 2026-09-01
+
+**Built:** the canonical `_shared/opsette-bridge/` vendored verbatim into
+`src/components/opsette-bridge/`; `src/lib/bridgeInstance.ts` (ported from
+Content Flow — `setBridgeInstance`/`getBridgeInstance`/`isBridgeMode`, plus
+the `parentKnownIds` tracking that gates `bridge.delete`); `main.tsx` calls
+`connectBridge()` and, when bridged, hydrates before the first render, same
+shape as Content Flow's own bootstrap (render is never blocked past the 1s
+handshake — hydration only runs after a bridge already resolved, and it's
+just IDB `put`s, no network round trip). `flowsRepo` is the single place
+every CRUD path funnels through (all five pages already called it, nothing
+else touches IndexedDB directly), so bridge branching lives there instead of
+at each call site: `create`/`updateContent`/`rename`/`duplicate` all fire
+`bridge.save` when bridged, `remove` fires `bridge.delete` gated on
+`isParentKnown`. `FlowPage`'s autosave debounce is 300ms standalone / 1500ms
+bridged (`isBridgeMode()` checked per timer-set, so switching modes mid-session
+picks up immediately), and a dedicated cleanup effect flushes any pending save
+when the viewed flow changes or the page truly unmounts. `StandaloneNotice.tsx`
+is the `DataLossBanner`-shaped standalone note (SmartFlow-worded, "Your flows
+live in this browser"), rendered in `AppLayout` above `<Outlet/>`, hidden
+whenever `isBridgeMode()`. §8.2 honored: `hydrateFromBridge` only writes rows
+present in `init.items` and never clears or touches anything else already in
+IDB — a local-only flow is untouched, never uploaded, never deleted.
+
+**One real deviation from §5's literal wording, found while building, not
+guessed past:** step 4 says "every write also fires `bridge.save(id,
+content)`" and the task brief said `connectBridge<Flow["content"]>()` —
+i.e. the bridge carries only `content`. That doesn't actually work. A
+`Flow`'s `content` is `SmartFlowDoc | string` — the swimlane type is a rich
+object, self-describing, but all **four** outline types (flowchart,
+decision-tree, org-tree, timeline) store a plain string, indistinguishable
+from each other by shape alone. A bridge item is `{ data_id, value }` with no
+separate discriminator field, so hydrating from `content` alone would need to
+guess a hydrated row's diagram type — silently mislabeling three of the four
+outline types as whichever one the hydrate code assumed.
+
+Fix: the bridge's stored value is `BridgedFlowValue` (`db/types.ts`) —
+`{ type, name, content }`, not raw `content`. `type` is required to render
+the row at all (swimlane → `BuildMode`, everything else → `OutlineBuilder`);
+`name` rides along too since it's cheap and means a rename now syncs like
+every other write instead of being a special case. This is the only way a
+hydrated row round-trips correctly — carrying `content` alone was not a
+viable narrower option, not a judgment call between two workable designs.
+
+**Not done / not verified:**
+
+- **No live run yet.** Typechecks clean (`npx tsc -b`), but nobody has loaded
+  this build against the actual Opsette parent and watched the handshake,
+  `init.items` hydration, a live `bridge.save`, and a live `bridge.delete` all
+  actually fire. Do that before treating Phase 2 as closed — same caveat §7
+  already flagged for Phase 1's migration path.
+- **Parent-side action still open:** flipping SmartFlow's app entry to
+  `storage_scope: 'shared'` is explicitly Ruthnie's side (§8.1), not part of
+  this build.
+- **Full production build not run.** Per standing project rules, that only
+  happens once Ruthnie has verified in the running app and confirmed the dev
+  server is closed.

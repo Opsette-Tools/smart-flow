@@ -7,6 +7,7 @@ import { useThemeMode } from "@/lib/theme";
 import { haptic } from "@/lib/haptics";
 import AboutModal from "@/components/AboutModal";
 import PrivacyModal from "@/components/PrivacyModal";
+import StandaloneNotice from "@/components/StandaloneNotice";
 import { ChooserModal } from "@/components/smartflow/ChooserModal";
 import { useCreateFlow } from "@/lib/useCreateFlow";
 import { FlowsProvider } from "./FlowsContext";
@@ -142,6 +143,7 @@ function AppLayoutInner() {
           )}
 
           <Content style={{ background: isDark ? "#000" : "#f5f6f8" }}>
+            <StandaloneNotice />
             <main className="sf-main">
               <Outlet />
             </main>

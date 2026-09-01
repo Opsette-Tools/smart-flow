@@ -21,3 +21,12 @@ export interface Flow {
 export const DB_NAME = "smart-flow";
 export const DB_VERSION = 1;
 export const FLOWS_STORE = "flows";
+
+/**
+ * What one row sends over the Opsette bridge. `content` alone isn't
+ * self-describing — every outline type (flowchart, decision-tree, org-tree,
+ * timeline) stores a plain string, indistinguishable from each other by
+ * shape — so `type` and `name` ride along too, or a hydrated row can't be
+ * rendered correctly. See docs/SMARTFLOW_STORAGE_PLAN.md §5.
+ */
+export type BridgedFlowValue = Pick<Flow, "type" | "name" | "content">;
