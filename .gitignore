@@ -25,3 +25,6 @@ dev-dist
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Client discovery transcripts/exports — not for the public repo
+meeting-summaries/

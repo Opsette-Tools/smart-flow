@@ -9,6 +9,7 @@ import {
   EditOutlined,
   CopyOutlined,
   DeleteOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
 import { reducer, emptyDoc } from "@/components/discovery/store";
 import { SessionHeaderForm } from "@/components/discovery/build/SessionHeaderForm";
@@ -18,6 +19,8 @@ import { discoverySessionsRepo } from "@/db/discoverySessionsRepo";
 import type { DiscoverySession } from "@/db/discoveryTypes";
 import { setActiveDiscoverySessionId } from "@/lib/activeDiscoverySession";
 import { useDiscoverySessions } from "@/layout/DiscoveryContext";
+import { discoveryExportFileName, serializeDiscoveryExport } from "@/lib/discoveryExport";
+import { triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
 type ViewMode = "header" | "steps" | "tables";
@@ -109,6 +112,15 @@ export default function DiscoverySessionPage() {
     if (copy) navigate(`/discovery/${copy.id}`);
   };
 
+  const handleExport = () => {
+    if (!session) return;
+    // `session` (React state) only updates on load/rename — the live doc
+    // lives in the useReducer above. Serialize the CURRENT doc, not the
+    // frozen `session.content`, same fix FlowPage.tsx's handleExport applies.
+    const json = serializeDiscoveryExport({ ...session, content: doc });
+    triggerDownload(new Blob([json], { type: "application/json" }), discoveryExportFileName(session.name));
+  };
+
   const handleDelete = () => {
     if (!session) return;
     const target = session;
@@ -158,11 +170,13 @@ export default function DiscoverySessionPage() {
               items: [
                 { key: "rename", label: "Rename", icon: <EditOutlined /> },
                 { key: "duplicate", label: "Duplicate", icon: <CopyOutlined /> },
+                { key: "export", label: "Export", icon: <ExportOutlined /> },
                 { key: "delete", label: "Delete", icon: <DeleteOutlined />, danger: true },
               ],
               onClick: ({ key }) => {
                 if (key === "rename") openRename();
                 if (key === "duplicate") handleDuplicate();
+                if (key === "export") handleExport();
                 if (key === "delete") handleDelete();
               },
             }}

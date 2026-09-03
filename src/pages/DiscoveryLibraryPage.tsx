@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, Dropdown, Empty, Input, List, Modal, Typography, message } from "antd";
-import { CopyOutlined, DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined } from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ImportOutlined, MoreOutlined, PlusOutlined } from "@ant-design/icons";
 import { discoverySessionsRepo } from "@/db/discoverySessionsRepo";
 import type { DiscoverySession } from "@/db/discoveryTypes";
 import { useCreateDiscoverySession } from "@/lib/useCreateDiscoverySession";
 import { useDiscoverySessions } from "@/layout/DiscoveryContext";
+import {
+  discoveryExportFileName,
+  parseDiscoveryImport,
+  serializeDiscoveryExport,
+} from "@/lib/discoveryExport";
+import { triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
 
@@ -27,10 +33,36 @@ export default function DiscoveryLibraryPage() {
   const [renaming, setRenaming] = useState<DiscoverySession | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const { openSession, createSession } = useCreateDiscoverySession();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreate = async () => {
     await createSession();
     refresh();
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-importing the same file name later
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const parsed = parseDiscoveryImport(reader.result as string);
+      if (!parsed) {
+        message.error("That isn't a discovery session export file.");
+        return;
+      }
+      const session = await discoverySessionsRepo.create(parsed);
+      refresh();
+      message.success(`Imported "${session.name}"`);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExport = (session: DiscoverySession) => {
+    const json = serializeDiscoveryExport(session);
+    triggerDownload(new Blob([json], { type: "application/json" }), discoveryExportFileName(session.name));
   };
 
   const handleDuplicate = async (session: DiscoverySession) => {
@@ -71,9 +103,21 @@ export default function DiscoveryLibraryPage() {
         <Text type="secondary" className="sf-topbar-which">
           Discovery sessions
         </Text>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          New session
-        </Button>
+        <span style={{ display: "flex", gap: 8 }}>
+          <Button icon={<ImportOutlined />} onClick={handleImportClick}>
+            Import
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            New session
+          </Button>
+        </span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleFileChange}
+          style={{ display: "none" }}
+        />
       </div>
 
       {sessions.length === 0 ? (
@@ -95,12 +139,14 @@ export default function DiscoveryLibraryPage() {
                     items: [
                       { key: "rename", label: "Rename", icon: <EditOutlined /> },
                       { key: "duplicate", label: "Duplicate", icon: <CopyOutlined /> },
+                      { key: "export", label: "Export", icon: <ExportOutlined /> },
                       { key: "delete", label: "Delete", icon: <DeleteOutlined />, danger: true },
                     ],
                     onClick: ({ key, domEvent }) => {
                       domEvent.stopPropagation();
                       if (key === "rename") openRename(session);
                       if (key === "duplicate") handleDuplicate(session);
+                      if (key === "export") handleExport(session);
                       if (key === "delete") handleDelete(session);
                     },
                   }}
