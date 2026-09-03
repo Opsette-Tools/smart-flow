@@ -1333,6 +1333,17 @@ html.dark .sf-map-note-icon {
   flex-direction: column;
   gap: var(--ops-space-md);
 }
+
+/* The outline types' step list (flowchart, decision tree, org chart,
+   timeline). A row is a card, not a full-bleed table — capped to a reading
+   width so it doesn't stretch edge to edge on a wide screen. The diagram
+   canvas below stays full width; only this list is capped. */
+.sf-outline-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-xs);
+  max-width: 640px;
+}
 .sf-board-head {
   display: flex;
   align-items: flex-end;

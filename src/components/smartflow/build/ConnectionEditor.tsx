@@ -2,6 +2,7 @@ import { type Dispatch } from "react";
 import { Input, Select } from "antd";
 import { DragOutlined } from "@ant-design/icons";
 import type { Action } from "../store";
+import { isDecisionStep } from "../diagram/itemGraph";
 import {
   MECHANISMS,
   connectionMechanisms,
@@ -15,12 +16,19 @@ import {
   type Lane,
 } from "../types";
 import { haptic } from "@/lib/haptics";
+import { BranchLabelEditor } from "./BranchLabelEditor";
 
 interface Props {
   item: Item;
   allItems: Item[];
   lanes: Lane[];
   dispatch: Dispatch<Action>;
+  /** True for flowchart/decision-tree — diagram types where a step can be a
+   *  yes/no fork. When this step's own label reads as a question, the
+   *  per-connection detail below is branch labels (Yes/No), not handoff
+   *  mechanism — the two answer different questions and don't both apply to
+   *  the same edge. Swimlane (the default) never sets this. */
+  branching?: boolean;
 }
 
 /**
@@ -32,27 +40,44 @@ interface Props {
  * arrow alone only says a handoff exists. The method says what carries it: an
  * email, a spreadsheet, someone walking over.
  */
-export function ConnectionEditor({ item, allItems, lanes, dispatch }: Props) {
+export function ConnectionEditor({ item, allItems, lanes, dispatch, branching }: Props) {
   const laneName = new Map(lanes.map((l) => [l.id, l.name] as const));
+  const showBranchLabels = branching && isDecisionStep(item.label);
 
-  // Build grouped options: one group per lane (in column order), then Inbox.
-  const groups = lanes
-    .slice()
-    .sort((a, b) => a.order - b.order)
-    .map((lane) => ({
-      label: lane.name,
-      options: allItems
-        .filter((i) => i.laneId === lane.id && i.id !== item.id)
-        .sort((a, b) => a.order - b.order)
-        .map((i) => ({ value: i.id, label: i.label })),
-    }))
-    .filter((g) => g.options.length > 0);
+  // A lane-less doc (every outline type) has nothing meaningful to group by —
+  // every other item is a flat list of options, no "Inbox" heading needed.
+  const groups =
+    lanes.length === 0
+      ? [
+          {
+            label: "",
+            options: allItems
+              .filter((i) => i.id !== item.id)
+              .sort((a, b) => a.order - b.order)
+              .map((i) => ({ value: i.id, label: i.label })),
+          },
+        ].filter((g) => g.options.length > 0)
+      : (() => {
+          // Build grouped options: one group per lane (in column order), then Inbox.
+          const laneGroups = lanes
+            .slice()
+            .sort((a, b) => a.order - b.order)
+            .map((lane) => ({
+              label: lane.name,
+              options: allItems
+                .filter((i) => i.laneId === lane.id && i.id !== item.id)
+                .sort((a, b) => a.order - b.order)
+                .map((i) => ({ value: i.id, label: i.label })),
+            }))
+            .filter((g) => g.options.length > 0);
 
-  const inboxOptions = allItems
-    .filter((i) => i.laneId === null && i.id !== item.id)
-    .sort((a, b) => a.order - b.order)
-    .map((i) => ({ value: i.id, label: i.label }));
-  if (inboxOptions.length > 0) groups.push({ label: "Inbox", options: inboxOptions });
+          const inboxOptions = allItems
+            .filter((i) => i.laneId === null && i.id !== item.id)
+            .sort((a, b) => a.order - b.order)
+            .map((i) => ({ value: i.id, label: i.label }));
+          if (inboxOptions.length > 0) laneGroups.push({ label: "Inbox", options: inboxOptions });
+          return laneGroups;
+        })();
 
   // Name the lane only when the target is in a DIFFERENT lane. Prefixing
   // "Delivery ·" onto a step while you are standing in Delivery is noise; the
@@ -115,7 +140,14 @@ export function ConnectionEditor({ item, allItems, lanes, dispatch }: Props) {
         }}
       />
 
-      {item.connectsTo.length > 0 && (
+      {item.connectsTo.length > 0 && showBranchLabels && (
+        <>
+          <h4 className="sf-field-title"><DragOutlined /> Branch label</h4>
+          <BranchLabelEditor item={item} allItems={allItems} dispatch={dispatch} />
+        </>
+      )}
+
+      {item.connectsTo.length > 0 && !showBranchLabels && (
         <div className="sf-mech-list">
           <h4 className="sf-field-title"><DragOutlined /> Handoff method</h4>
           {item.connectsTo.map((toId) => {

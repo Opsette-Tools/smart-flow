@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { flowsRepo } from "@/db/flowsRepo";
 import type { DiagramType } from "@/components/smartflow/diagramTypes";
+import { outlineTextToDoc } from "@/components/smartflow/outlineImport";
 import type { Template } from "@/components/smartflow/templates";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
 import { setActiveFlowId } from "@/lib/activeFlow";
@@ -26,8 +27,10 @@ export function useCreateFlow() {
   };
 
   const createFromTemplate = async (template: Template) => {
-    const content: SmartFlowDoc | string =
-      template.type === "swimlane" && template.makeDoc ? template.makeDoc() : template.outline ?? "";
+    const content: SmartFlowDoc =
+      template.type === "swimlane" && template.makeDoc
+        ? template.makeDoc()
+        : outlineTextToDoc(template.type as Exclude<DiagramType, "swimlane">, template.outline ?? "");
     const flow = await flowsRepo.create({ type: template.type, name: template.name, content });
     refresh();
     openFlow(flow.id);

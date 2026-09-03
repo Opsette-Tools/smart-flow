@@ -23,7 +23,7 @@ interface SmartFlowExportFile {
   flow: {
     type: DiagramType;
     name: string;
-    content: SmartFlowDoc | string;
+    content: SmartFlowDoc;
   };
 }
 
@@ -45,7 +45,7 @@ export function flowExportFileName(name: string): string {
 export interface ParsedFlowImport {
   type: DiagramType;
   name: string;
-  content: SmartFlowDoc | string;
+  content: SmartFlowDoc;
 }
 
 const VALID_TYPES: DiagramType[] = ["flowchart", "swimlane", "decision-tree", "org-tree", "timeline"];
@@ -79,21 +79,18 @@ export function parseFlowImport(text: string): ParsedFlowImport | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
 
-  // Shape 1 — a real Export.
+  // Shape 1 — a real Export. Every type stores the same doc shape now.
   if (r.type === EXPORT_TYPE) {
     if (typeof r.flow !== "object" || r.flow === null) return null;
     const f = r.flow as Record<string, unknown>;
     if (typeof f.type !== "string" || !VALID_TYPES.includes(f.type as DiagramType)) return null;
     if (typeof f.name !== "string") return null;
-    if (f.type === "swimlane") {
-      if (!isLikelySmartFlowDoc(f.content)) return null;
-    } else if (typeof f.content !== "string") {
-      return null;
-    }
-    return { type: f.type as DiagramType, name: f.name, content: f.content as SmartFlowDoc | string };
+    if (!isLikelySmartFlowDoc(f.content)) return null;
+    return { type: f.type as DiagramType, name: f.name, content: f.content as unknown as SmartFlowDoc };
   }
 
-  // Shape 2 — the raw legacy backup: { v, doc } or a bare doc.
+  // Shape 2 — the raw legacy backup: { v, doc } or a bare doc. Always a
+  // swimlane doc — this format predates every other type storing SmartFlowDoc.
   const doc = isLikelySmartFlowDoc(r.doc) ? r.doc : isLikelySmartFlowDoc(r) ? r : null;
   if (doc) {
     return { type: "swimlane", name: "Imported swimlane", content: doc as unknown as SmartFlowDoc };

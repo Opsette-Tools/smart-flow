@@ -3,11 +3,15 @@
  * tree). A compact version of the Reingold-Tilford idea: lay leaves out
  * left-to-right, then center each parent over its children. Good enough for the
  * small trees a small-business user will paste, with no extra dependency.
+ *
+ * Reads Item[] directly: a parent's connectsTo lists its children in order.
+ * Decision-tree uses Connection.label ("Yes"/"No") for edge labels; org-tree
+ * has none.
  */
 
 import { MarkerType, type Edge, type Node } from "reactflow";
-import type { OutlineNode } from "../outline";
-import { flattenOutline } from "../outline";
+import type { Item } from "../types";
+import { connectionLabel, findGraphRoots } from "./itemGraph";
 
 const NODE_W = 200;
 const NODE_H = 52;
@@ -20,35 +24,41 @@ export interface TreeLayoutResult {
 }
 
 interface Positioned {
-  node: OutlineNode;
+  item: Item;
   x: number;
   y: number;
 }
 
 export function buildTreeLayout(
-  roots: OutlineNode[],
+  items: Item[],
   isDark: boolean,
-  opts: { nodeType?: string; edgeLabels?: Map<string, string> } = {},
+  opts: { nodeType?: string; edgeLabels?: boolean } = {},
 ): TreeLayoutResult {
+  const byId = new Map(items.map((i) => [i.id, i]));
   const positioned = new Map<string, Positioned>();
+  const visited = new Set<string>();
   let cursorX = 0;
 
   // Post-order placement: leaves get the next x slot; parents center on kids.
-  const place = (n: OutlineNode, depth: number): number => {
+  const place = (item: Item, depth: number): number => {
+    visited.add(item.id);
     const y = depth * (NODE_H + V_GAP);
-    if (n.children.length === 0) {
+    const children = item.connectsTo
+      .map((id) => byId.get(id))
+      .filter((c): c is Item => !!c && !visited.has(c.id));
+    if (children.length === 0) {
       const x = cursorX;
       cursorX += NODE_W + H_GAP;
-      positioned.set(n.id, { node: n, x, y });
+      positioned.set(item.id, { item, x, y });
       return x;
     }
-    const childXs = n.children.map((c) => place(c, depth + 1));
+    const childXs = children.map((c) => place(c, depth + 1));
     const x = (childXs[0] + childXs[childXs.length - 1]) / 2;
-    positioned.set(n.id, { node: n, x, y });
+    positioned.set(item.id, { item, x, y });
     return x;
   };
 
-  // Place each root, separating multiple roots horizontally.
+  const roots = findGraphRoots(items);
   for (const root of roots) {
     place(root, 0);
     cursorX += H_GAP; // breathing room between separate roots
@@ -56,12 +66,12 @@ export function buildTreeLayout(
 
   const nodeType = opts.nodeType ?? "itemNode";
   const nodes: Node[] = [];
-  for (const { node, x, y } of positioned.values()) {
+  for (const { item, x, y } of positioned.values()) {
     nodes.push({
-      id: node.id,
+      id: item.id,
       type: nodeType,
       position: { x, y },
-      data: { label: node.label },
+      data: { label: item.label },
       draggable: false,
       selectable: false,
       width: NODE_W,
@@ -71,24 +81,26 @@ export function buildTreeLayout(
 
   const edgeColor = isDark ? "#cfae60" : "#426f62";
   const edges: Edge[] = [];
-  for (const node of flattenOutline(roots)) {
-    if (!node.parentId) continue;
-    const label = opts.edgeLabels?.get(node.id);
-    edges.push({
-      id: `e:${node.parentId}->${node.id}`,
-      source: node.parentId,
-      target: node.id,
-      sourceHandle: "s-bottom",
-      targetHandle: "t-top",
-      type: "smoothstep",
-      label,
-      labelStyle: label ? { fontSize: 12, fontWeight: 600, fill: edgeColor } : undefined,
-      labelBgStyle: label
-        ? { fill: isDark ? "#0e0e0e" : "#fafafa", fillOpacity: 0.9 }
-        : undefined,
-      style: { stroke: edgeColor, strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 16, height: 16 },
-    });
+  for (const { item } of positioned.values()) {
+    for (const childId of item.connectsTo) {
+      if (!positioned.has(childId)) continue;
+      const label = opts.edgeLabels ? connectionLabel(item, childId) : undefined;
+      edges.push({
+        id: `e:${item.id}->${childId}`,
+        source: item.id,
+        target: childId,
+        sourceHandle: "s-bottom",
+        targetHandle: "t-top",
+        type: "smoothstep",
+        label,
+        labelStyle: label ? { fontSize: 12, fontWeight: 600, fill: edgeColor } : undefined,
+        labelBgStyle: label
+          ? { fill: isDark ? "#0e0e0e" : "#fafafa", fillOpacity: 0.9 }
+          : undefined,
+        style: { stroke: edgeColor, strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 16, height: 16 },
+      });
+    }
   }
 
   return { nodes, edges };

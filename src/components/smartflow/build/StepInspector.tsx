@@ -12,6 +12,9 @@ interface Props {
   lanes: Lane[];
   dispatch: Dispatch<Action>;
   onClose: () => void;
+  /** True for flowchart/decision-tree. See ConnectionEditor's own doc for why
+   *  this changes what the handoff section shows. */
+  branching?: boolean;
 }
 
 /**
@@ -19,7 +22,7 @@ interface Props {
  * owns the toolbar, the scrolling well, and the resize handle, so a panel that
  * set its own height and background would paint over the handle.
  */
-export function StepInspector({ item, allItems, lanes, dispatch, onClose }: Props) {
+export function StepInspector({ item, allItems, lanes, dispatch, onClose, branching }: Props) {
   if (!item) {
     return (
       <div className="sf-panel-empty">
@@ -31,7 +34,11 @@ export function StepInspector({ item, allItems, lanes, dispatch, onClose }: Prop
     );
   }
 
-  const laneName = item.laneId
+  // A doc with no lanes at all (every outline type) has nothing to name here
+  // — "Inbox" would be a lane concept leaking into a diagram type that never
+  // had lanes, so the head row is skipped entirely rather than shown as a
+  // label that means nothing in this context.
+  const laneName = lanes.length === 0 ? null : item.laneId
     ? lanes.find((l) => l.id === item.laneId)?.name ?? "Unknown lane"
     : "Inbox";
 
@@ -39,9 +46,11 @@ export function StepInspector({ item, allItems, lanes, dispatch, onClose }: Prop
     <div className="sf-panel">
       {/* The drawer's toolbar already carries the step name, so this only adds
           the piece the toolbar can't: which lane the step sits in. */}
-      <div className="sf-panel-head">
-        <span className="sf-inspector-lane">{laneName}</span>
-      </div>
+      {laneName && (
+        <div className="sf-panel-head">
+          <span className="sf-inspector-lane">{laneName}</span>
+        </div>
+      )}
 
       <div className="sf-panel-fields">
         <StepDetailFields
@@ -49,6 +58,7 @@ export function StepInspector({ item, allItems, lanes, dispatch, onClose }: Prop
           allItems={allItems}
           lanes={lanes}
           dispatch={dispatch}
+          branching={branching}
         />
       </div>
 

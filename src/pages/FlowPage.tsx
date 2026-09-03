@@ -18,7 +18,7 @@ import { ChartsPanel } from "@/components/smartflow/diagram/ChartsPanel";
 import { DiagramView } from "@/components/smartflow/diagram/DiagramView";
 import { SchemaMapView } from "@/components/smartflow/schemamap/SchemaMapView";
 import { OutlineBuilder } from "@/components/smartflow/OutlineBuilder";
-import type { SmartFlowDoc } from "@/components/smartflow/types";
+import type { DiagramType } from "@/components/smartflow/diagramTypes";
 import { flowsRepo } from "@/db/flowsRepo";
 import type { Flow } from "@/db/types";
 import { setActiveFlowId } from "@/lib/activeFlow";
@@ -27,7 +27,7 @@ import { useFlows } from "@/layout/FlowsContext";
 import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
-type SwimMode = "build" | "diagram" | "charts" | "map";
+type ViewMode = "build" | "diagram" | "charts" | "map";
 
 // Free against local IndexedDB; a request to a parent that writes to a real
 // database on every keystroke is not. Bumped when bridged — see
@@ -48,19 +48,27 @@ export default function FlowPage() {
   // undefined = loading this id, null = id doesn't resolve to a saved flow.
   const [flow, setFlow] = useState<Flow | null | undefined>(undefined);
   const [doc, dispatch] = useReducer(reducer, emptyDoc);
-  const [outlineText, setOutlineText] = useState("");
-  const [swimMode, setSwimMode] = useState<SwimMode>("build");
+  const [viewMode, setViewMode] = useState<ViewMode>("build");
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const saveTimer = useRef<number | undefined>(undefined);
   // Guards autosave from firing on the previous flow's leftover state while
   // the new id's row is still loading.
   const loadedIdRef = useRef<string | null>(null);
-  // Mirrors the latest doc/outlineText/flow so the unmount-flush effect below
-  // (which must run only once, on true unmount) can read current values
-  // without depending on them and re-firing on every keystroke.
-  const latestRef = useRef({ flow, doc, outlineText });
-  latestRef.current = { flow, doc, outlineText };
+  // Mirrors the latest doc/flow so the unmount-flush effect below (which must
+  // run only once, on true unmount) can read current values without
+  // depending on them and re-firing on every keystroke.
+  const latestRef = useRef({ flow, doc });
+  latestRef.current = { flow, doc };
+
+  // "Map" is a swimlane-only tab (SchemaMapView draws one card per lane).
+  // Navigating from a swimlane on Map straight to an outline-type flow would
+  // otherwise leave viewMode pointed at an option the Segmented control no
+  // longer offers, silently rendering the Map view under a "Build"-highlighted
+  // control.
+  useEffect(() => {
+    if (viewMode === "map" && flow && flow.type !== "swimlane") setViewMode("build");
+  }, [flow, viewMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,11 +82,7 @@ export default function FlowPage() {
       }
       setFlow(f);
       loadedIdRef.current = f.id;
-      if (f.type === "swimlane") {
-        dispatch({ type: "REPLACE_DOC", doc: f.content as SmartFlowDoc });
-      } else {
-        setOutlineText(f.content as string);
-      }
+      dispatch({ type: "REPLACE_DOC", doc: f.content });
       setActiveFlowId(f.id);
     });
     return () => {
@@ -86,13 +90,14 @@ export default function FlowPage() {
     };
   }, [id]);
 
-  // Autosave, swimlane doc. Skipped until this flow's own row has loaded so
-  // the reducer's initial emptyDoc can never clobber a real saved board
-  // mid-navigation. Standard debounce: a superseded timer is cleared, not
-  // fired early — the flush-on-unmount effect below covers the case where
-  // the page leaves before the timer would have fired.
+  // Autosave. Every diagram type shares one doc shape now, so one effect
+  // covers all of them. Skipped until this flow's own row has loaded so the
+  // reducer's initial emptyDoc can never clobber a real saved board mid-
+  // navigation. Standard debounce: a superseded timer is cleared, not fired
+  // early — the flush-on-unmount effect below covers the case where the page
+  // leaves before the timer would have fired.
   useEffect(() => {
-    if (!flow || flow.type !== "swimlane" || loadedIdRef.current !== flow.id) return;
+    if (!flow || loadedIdRef.current !== flow.id) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     const debounceMs = isBridgeMode() ? AUTOSAVE_DEBOUNCE_BRIDGED_MS : AUTOSAVE_DEBOUNCE_STANDALONE_MS;
     saveTimer.current = window.setTimeout(() => {
@@ -104,34 +109,19 @@ export default function FlowPage() {
     };
   }, [doc, flow]);
 
-  // Autosave, outline text — same shape, the other content type.
-  useEffect(() => {
-    if (!flow || flow.type === "swimlane" || loadedIdRef.current !== flow.id) return;
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    const debounceMs = isBridgeMode() ? AUTOSAVE_DEBOUNCE_BRIDGED_MS : AUTOSAVE_DEBOUNCE_STANDALONE_MS;
-    saveTimer.current = window.setTimeout(() => {
-      saveTimer.current = undefined;
-      flowsRepo.updateContent(flow.id, outlineText);
-    }, debounceMs);
-    return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    };
-  }, [outlineText, flow]);
-
   // Flush whatever's pending when the flow being viewed changes (route
   // navigation to a different id) or the page truly unmounts, so a change
   // made just before leaving isn't lost to a debounce timer that never got
-  // to fire. Reads latestRef rather than depending on doc/outlineText/flow
-  // directly so this effect runs only on those two transitions, not on
-  // every keystroke.
+  // to fire. Reads latestRef rather than depending on doc/flow directly so
+  // this effect runs only on those two transitions, not on every keystroke.
   useEffect(() => {
     return () => {
       if (!saveTimer.current) return;
       window.clearTimeout(saveTimer.current);
       saveTimer.current = undefined;
-      const { flow: f, doc: d, outlineText: t } = latestRef.current;
+      const { flow: f, doc: d } = latestRef.current;
       if (!f || loadedIdRef.current !== f.id) return;
-      flowsRepo.updateContent(f.id, f.type === "swimlane" ? d : t);
+      flowsRepo.updateContent(f.id, d);
     };
   }, [id]);
 
@@ -226,32 +216,41 @@ export default function FlowPage() {
             <Button type="text" size="small" icon={<MoreOutlined />} aria-label={`Actions for ${flow.name}`} />
           </Dropdown>
         </span>
-        {flow.type === "swimlane" && (
-          <Segmented<SwimMode>
-            value={swimMode}
-            onChange={setSwimMode}
-            options={[
-              { label: "Build", value: "build", icon: <AppstoreOutlined /> },
-              { label: "Summary", value: "diagram", icon: <FileTextOutlined /> },
-              { label: "Charts", value: "charts", icon: <BarChartOutlined /> },
-              { label: "Map", value: "map", icon: <ApartmentOutlined /> },
-            ]}
-          />
-        )}
+        <Segmented<ViewMode>
+          value={viewMode}
+          onChange={setViewMode}
+          options={
+            flow.type === "swimlane"
+              ? [
+                  { label: "Build", value: "build", icon: <AppstoreOutlined /> },
+                  { label: "Summary", value: "diagram", icon: <FileTextOutlined /> },
+                  { label: "Charts", value: "charts", icon: <BarChartOutlined /> },
+                  { label: "Map", value: "map", icon: <ApartmentOutlined /> },
+                ]
+              : [
+                  // Map isn't wired for lane-less docs yet — SchemaMapView draws
+                  // one card per lane, and a flowchart/decision-tree/org-tree/
+                  // timeline has none. Coming in a later pass.
+                  { label: "Build", value: "build", icon: <AppstoreOutlined /> },
+                  { label: "Summary", value: "diagram", icon: <FileTextOutlined /> },
+                  { label: "Charts", value: "charts", icon: <BarChartOutlined /> },
+                ]
+          }
+        />
       </div>
 
-      {flow.type === "swimlane" ? (
-        swimMode === "build" ? (
+      {viewMode === "build" ? (
+        flow.type === "swimlane" ? (
           <BuildMode doc={doc} dispatch={dispatch} />
-        ) : swimMode === "map" ? (
-          <SchemaMapView doc={doc} dispatch={dispatch} />
-        ) : swimMode === "charts" ? (
-          <ChartsPanel doc={doc} />
         ) : (
-          <DiagramView doc={doc} dispatch={dispatch} />
+          <OutlineBuilder type={flow.type as Exclude<DiagramType, "swimlane">} doc={doc} dispatch={dispatch} />
         )
+      ) : viewMode === "map" ? (
+        <SchemaMapView doc={doc} dispatch={dispatch} />
+      ) : viewMode === "charts" ? (
+        <ChartsPanel doc={doc} />
       ) : (
-        <OutlineBuilder type={flow.type} text={outlineText} onChange={setOutlineText} />
+        <DiagramView doc={doc} dispatch={dispatch} />
       )}
 
       <Modal open={renaming} title="Rename flow" onCancel={() => setRenaming(false)} onOk={submitRename} okText="Save">

@@ -19,13 +19,16 @@ interface Props {
   allItems: Item[];
   lanes: Lane[];
   dispatch: Dispatch<Action>;
+  /** True for flowchart/decision-tree. See ConnectionEditor's own doc for why
+   *  this changes what the handoff section shows. */
+  branching?: boolean;
 }
 
 /**
  * The editable fields for one step. Shared by the step drawer and the lane
  * review so the two can never drift apart.
  */
-export function StepDetailFields({ item, allItems, lanes, dispatch }: Props) {
+export function StepDetailFields({ item, allItems, lanes, dispatch, branching }: Props) {
   return (
     <>
       <section className="sf-field-group">
@@ -109,7 +112,7 @@ export function StepDetailFields({ item, allItems, lanes, dispatch }: Props) {
 
       <section className="sf-field-group">
         <h4 className="sf-field-title"><ShareAltOutlined /> This step hands off to</h4>
-        <ConnectionEditor item={item} allItems={allItems} lanes={lanes} dispatch={dispatch} />
+        <ConnectionEditor item={item} allItems={allItems} lanes={lanes} dispatch={dispatch} branching={branching} />
       </section>
 
       <section className="sf-field-group">

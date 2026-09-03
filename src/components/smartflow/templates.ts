@@ -3,11 +3,12 @@
  * process a user can load with one click.
  *
  * A brand-new user shouldn't face a blank box. Each template declares which
- * diagram type it loads and carries its content in the exact shape that type
- * already consumes:
+ * diagram type it loads and carries its content in whichever shape is easiest
+ * to author:
  *   - outline types (flowchart / decision-tree / org-tree / timeline) store the
- *     same indented plain text a user would type, so the existing parseOutline +
- *     layoutFor pipeline renders them with zero new code.
+ *     same indented plain text a user would type. useCreateFlow runs it through
+ *     outlineTextToDoc() once, at load time, into a real Item[]-backed doc —
+ *     the text here is authoring convenience, not the stored shape.
  *   - swimlane templates store a full SmartFlowDoc, built by buildSwimDoc so ids,
  *     order, and cross-lane connections come out correct without hand-numbering.
  *

@@ -26,7 +26,12 @@ interface Props {
 export function DiagramView({ doc, dispatch }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
 
-  const placedCount = doc.items.filter((i) => i.laneId !== null).length;
+  // A lane-less doc (every outline type) has no inbox to be "unplaced" from —
+  // every item already counts. Swimlane keeps the real distinction: an item
+  // still sitting in the inbox hasn't been placed, so it shouldn't show up as
+  // a finding yet.
+  const hasLanes = doc.lanes.length > 0;
+  const placedCount = hasLanes ? doc.items.filter((i) => i.laneId !== null).length : doc.items.length;
   const hasContent = placedCount > 0;
 
   return (
@@ -51,8 +56,8 @@ export function DiagramView({ doc, dispatch }: Props) {
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
-              doc.lanes.length === 0
-                ? "Add lanes and steps in Build mode — findings show up here."
+              !hasLanes
+                ? "Add steps in Build mode — findings show up here."
                 : "Assign some steps to lanes in Build mode — findings show up here."
             }
           />

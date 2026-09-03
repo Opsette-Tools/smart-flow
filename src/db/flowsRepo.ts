@@ -53,10 +53,6 @@ function getDb() {
   return dbPromise;
 }
 
-function defaultContent(type: DiagramType): SmartFlowDoc | string {
-  return type === "swimlane" ? emptyDoc : "";
-}
-
 export const flowsRepo = {
   async list(): Promise<Flow[]> {
     const db = await getDb();
@@ -72,7 +68,7 @@ export const flowsRepo = {
   async create(opts: {
     type: DiagramType;
     name?: string;
-    content?: SmartFlowDoc | string;
+    content?: SmartFlowDoc;
   }): Promise<Flow> {
     const db = await getDb();
     const now = Date.now();
@@ -82,14 +78,14 @@ export const flowsRepo = {
       name: opts.name?.trim() || `Untitled ${diagramInfo(opts.type).name}`,
       createdAt: now,
       updatedAt: now,
-      content: opts.content ?? defaultContent(opts.type),
+      content: opts.content ?? emptyDoc,
     };
     await db.put(FLOWS_STORE, flow);
     persistToBridge(flow);
     return flow;
   },
 
-  async updateContent(id: string, content: SmartFlowDoc | string): Promise<void> {
+  async updateContent(id: string, content: SmartFlowDoc): Promise<void> {
     const db = await getDb();
     const existing = (await db.get(FLOWS_STORE, id)) as Flow | undefined;
     if (!existing) return;

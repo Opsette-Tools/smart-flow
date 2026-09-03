@@ -103,12 +103,24 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
   const laneName = new Map(lanes.map((l) => [l.id, l.name] as const));
   const byId = new Map(doc.items.map((i) => [i.id, i] as const));
 
-  const placed = doc.items.filter((i) => i.laneId !== null && laneName.has(i.laneId));
+  // A lane-less doc (every outline type) has no inbox concept at all — every
+  // item IS on the board, so "placed" just means "exists." Swimlane keeps its
+  // real distinction: an item sitting in the inbox hasn't been assigned yet,
+  // and counting it here would report on work the interview hasn't reached.
+  const hasLanes = lanes.length > 0;
+  const placed = hasLanes ? doc.items.filter((i) => i.laneId !== null && laneName.has(i.laneId)) : doc.items;
   const isPlaced = (id: string): boolean => {
+    if (!hasLanes) return byId.has(id);
     const i = byId.get(id);
     return !!i && i.laneId !== null && laneName.has(i.laneId);
   };
-  const laneOf = (i: Item): string => (i.laneId ? laneName.get(i.laneId) ?? INBOX_LANE : INBOX_LANE);
+  // Empty string (not "Inbox") for a lane-less doc — there is no lane to name,
+  // and every consumer below already knows to drop an empty lane clause
+  // rather than print a fake "Inbox" that would misdescribe a flowchart step.
+  const laneOf = (i: Item): string => {
+    if (!hasLanes) return "";
+    return i.laneId ? laneName.get(i.laneId) ?? INBOX_LANE : INBOX_LANE;
+  };
 
   // --- Orphans: no inbound, no outbound. Either a dead end or a missed handoff.
   const hasInbound = new Set<string>();
@@ -238,17 +250,27 @@ export function computeGaps(doc: SmartFlowDoc): GapsReport {
     (a, b) => b.count - a.count || a.name.localeCompare(b.name),
   );
 
-  // --- Open questions, grouped by lane, in lane order.
-  const openQuestions: OpenQuestionFinding[] = lanes
-    .map((lane) => ({
-      laneId: lane.id,
-      laneName: lane.name,
-      items: placed
-        .filter((i) => i.laneId === lane.id && i.openQuestion?.trim())
-        .sort((a, b) => a.order - b.order)
-        .map((i) => ({ itemId: i.id, label: i.label, question: i.openQuestion!.trim() })),
-    }))
-    .filter((g) => g.items.length > 0);
+  // --- Open questions, grouped by lane, in lane order. A lane-less doc has
+  // no lanes to group by, so every open question falls into one flat group
+  // instead of being silently dropped because `lanes` is empty.
+  const openQuestions: OpenQuestionFinding[] = hasLanes
+    ? lanes
+        .map((lane) => ({
+          laneId: lane.id,
+          laneName: lane.name,
+          items: placed
+            .filter((i) => i.laneId === lane.id && i.openQuestion?.trim())
+            .sort((a, b) => a.order - b.order)
+            .map((i) => ({ itemId: i.id, label: i.label, question: i.openQuestion!.trim() })),
+        }))
+        .filter((g) => g.items.length > 0)
+    : (() => {
+        const items = placed
+          .filter((i) => i.openQuestion?.trim())
+          .sort((a, b) => a.order - b.order)
+          .map((i) => ({ itemId: i.id, label: i.label, question: i.openQuestion!.trim() }));
+        return items.length > 0 ? [{ laneId: "", laneName: "", items }] : [];
+      })();
 
   // --- Mechanism tally: how each answered handoff's primary rung is used.
   // Ladder order (not count order) so the chart reads as the maturity ladder
@@ -336,8 +358,10 @@ export function handoffSentence(h: HandoffFinding): string {
 }
 
 /** Which lanes the handoff touches. States the fact and stops — whether a
- *  crossing is a problem is the reader's call, not this function's. */
-export function handoffContext(h: HandoffFinding): string {
+ *  crossing is a problem is the reader's call, not this function's. A
+ *  lane-less doc has no lane to name, so there's nothing to report here. */
+export function handoffContext(h: HandoffFinding): string | undefined {
+  if (!h.fromLane) return undefined;
   return h.crossLane
     ? `Crosses from ${h.fromLane} to ${h.toLane}.`
     : `Stays inside ${h.fromLane}.`;
@@ -397,22 +421,25 @@ export function buildSummary(doc: SmartFlowDoc): string {
 
   const section = (title: string, rows: string[]) => {
     if (rows.length === 0) return;
-    out.push(`<p><strong>${esc(title)}</strong></p>`);
+    if (title) out.push(`<p><strong>${esc(title)}</strong></p>`);
     out.push(`<ul>${rows.map((r) => `<li>${r}</li>`).join("")}</ul>`);
   };
 
-  for (const lane of lanes) {
+  // A lane-less doc (every outline type) has nothing to group by — one
+  // unheaded section covers every step instead of iterating zero lanes.
+  const laneGroups = lanes.length > 0 ? lanes.map((l) => l.name) : [""];
+  for (const laneName of laneGroups) {
     const rows: string[] = [];
-    for (const h of g.answeredHandoffs.filter((x) => x.fromLane === lane.name)) {
+    for (const h of g.answeredHandoffs.filter((x) => x.fromLane === laneName)) {
       rows.push(esc(handoffSentence(h)));
     }
-    for (const s of g.recordedNowhere.filter((x) => x.laneName === lane.name)) {
+    for (const s of g.recordedNowhere.filter((x) => x.laneName === laneName)) {
       rows.push(`${esc(s.label)} keeps no record.`);
     }
-    for (const o of g.orphans.filter((x) => x.laneName === lane.name)) {
+    for (const o of g.orphans.filter((x) => x.laneName === laneName)) {
       rows.push(`${esc(o.label)} has no step before or after.`);
     }
-    section(lane.name, rows);
+    section(laneName, rows);
   }
 
   section(
@@ -425,8 +452,10 @@ export function buildSummary(doc: SmartFlowDoc): string {
   section(
     "Outstanding questions",
     g.openQuestions.flatMap((group) =>
-      group.items.map(
-        (q) => `${esc(q.label)} (${esc(group.laneName)}) — ${esc(q.question)}`,
+      group.items.map((q) =>
+        group.laneName
+          ? `${esc(q.label)} (${esc(group.laneName)}) — ${esc(q.question)}`
+          : `${esc(q.label)} — ${esc(q.question)}`,
       ),
     ),
   );

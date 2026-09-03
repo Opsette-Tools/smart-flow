@@ -110,7 +110,10 @@ function upsertConnection(
   const all = connectionMechanisms(merged);
   if (!all.some((m) => m === "system")) delete merged.systemName;
 
-  const isEmpty = all.length === 0 && !merged.systemName;
+  // A branch label (flowchart/decision-tree "Yes"/"No") is its own kind of
+  // detail, independent of mechanism — a connection carrying only a label is
+  // NOT empty, or every Yes/No edge would vanish the instant it's set.
+  const isEmpty = all.length === 0 && !merged.systemName && !merged.label;
   const next = isEmpty
     ? existing.filter((c) => c.toId !== toId)
     : found
@@ -152,6 +155,10 @@ export type Action =
   | { type: "SET_SUMMARY"; text: string }
   | { type: "SET_MECHANISMS"; id: string; toId: string; mechanisms: HandoffMechanism[] }
   | { type: "SET_SYSTEM_NAME"; id: string; toId: string; systemName: string }
+  /** Branching diagrams only (flowchart, decision tree): label one outgoing
+   *  connection "Yes" / "No" / blank. Distinct from handoff mechanism — a
+   *  branch label answers "which path", not "how does work move." */
+  | { type: "SET_CONNECTION_LABEL"; id: string; toId: string; label: string }
   | { type: "SET_SYSTEM_OF_RECORD"; id: string; systemOfRecord: string }
   | { type: "SET_OPEN_QUESTION"; id: string; openQuestion: string }
   | { type: "SET_OWNER"; id: string; owner: string }
@@ -337,6 +344,20 @@ export function reducer(doc: SmartFlowDoc, action: Action): SmartFlowDoc {
         items: doc.items.map((i) =>
           i.id === action.id
             ? upsertConnection(i, action.toId, { systemName: name || undefined })
+            : i,
+        ),
+      };
+    }
+
+    case "SET_CONNECTION_LABEL": {
+      const source = doc.items.find((i) => i.id === action.id);
+      if (!source || !source.connectsTo.includes(action.toId)) return doc;
+      const label = action.label.trim();
+      return {
+        ...doc,
+        items: doc.items.map((i) =>
+          i.id === action.id
+            ? upsertConnection(i, action.toId, { label: label || undefined })
             : i,
         ),
       };

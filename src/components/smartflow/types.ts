@@ -119,6 +119,11 @@ export interface Connection {
   mechanisms?: HandoffMechanism[];
   /** Free text when mechanism is "system" — e.g. "QuickBooks". */
   systemName?: string;
+  /** Edge label for a branching diagram (flowchart, decision tree) — e.g.
+   *  "Yes" / "No". Absent on a plain sequential handoff. This is a display
+   *  label on the arrow, not a discovery finding, so it lives here rather
+   *  than being re-inferred from wording at render time. */
+  label?: string;
 }
 
 export interface Item {
@@ -145,6 +150,9 @@ export interface Item {
   /** Discovery: you've verified this step is accurate — as opposed to your
    *  best read from the interview, not yet checked. */
   validated?: boolean;
+  /** Timeline only: a date or date range shown under the milestone label
+   *  (e.g. "Mar - Apr"). Meaningless for every other type. */
+  dateNote?: string;
 }
 
 /** Every mechanism on a connection, single or compound, in pick order. The one

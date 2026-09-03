@@ -1,17 +1,19 @@
 /**
- * Flowchart + timeline layouts from a pasted outline.
+ * Flowchart + timeline layouts, reading directly from Item[].
  *
- * Flowchart: a top-to-bottom sequence of steps. A line that ends in "?" is a
- * decision — its two indented children become the Yes / No branches (first
- * child = Yes, second = No), drawn side by side, then the flow rejoins the next
- * top-level step. Plain lines just chain downward. This keeps the input dead
- * simple: paste steps; make one a question and indent the two answers under it.
+ * Flowchart: a top-to-bottom sequence of steps. A decision item (isDecision)
+ * has two outgoing connections labeled "Yes" and "No" — Yes continues down the
+ * center spine, No is drawn to the side. Plain items just chain downward via
+ * their single connectsTo target. The graph itself carries the shape now
+ * (connectsTo + Connection.label) — this file only turns that graph into
+ * positioned nodes, it doesn't infer structure from indentation any more.
  *
- * Timeline: a left-to-right row of milestones in the order pasted.
+ * Timeline: a left-to-right row of milestones in `order`.
  */
 
 import { MarkerType, type Edge, type Node } from "reactflow";
-import type { OutlineNode } from "../outline";
+import type { Item } from "../types";
+import { connectionLabel, findGraphRoots, isDecisionStep } from "./itemGraph";
 
 const STEP_W = 240;
 const STEP_H = 56;
@@ -21,10 +23,6 @@ const BRANCH_GAP = 88;
 export interface FlowLayoutResult {
   nodes: Node[];
   edges: Edge[];
-}
-
-function isDecision(label: string): boolean {
-  return label.trim().endsWith("?");
 }
 
 /**
@@ -90,22 +88,24 @@ function isSkipBranch(label: string): boolean {
   return SKIP_HINTS.some((h) => l.includes(h));
 }
 
-export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): FlowLayoutResult {
+export function buildFlowchartLayout(items: Item[], isDark: boolean): FlowLayoutResult {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   const edgeColor = isDark ? "#cfae60" : "#426f62";
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const placed = new Set<string>();
 
   const centerX = 0;
   let y = 0;
   let prevId: string | null = null;
   let prevHandle: "s-bottom" | "s-right" = "s-bottom";
 
-  const pushNode = (n: OutlineNode, x: number, type: string) => {
+  const pushNode = (item: Item, x: number, type: string) => {
     nodes.push({
-      id: n.id,
+      id: item.id,
       type,
       position: { x, y },
-      data: { label: n.label },
+      data: { label: item.label },
       draggable: false,
       selectable: false,
       width: STEP_W,
@@ -147,29 +147,39 @@ export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): Flo
     pendingMerges = [];
   };
 
-  for (const step of roots) {
-    const decision = isDecision(step.label);
+  // Walk the spine: at each step, follow its single "continues the flow"
+  // successor. A decision step's Yes target becomes that successor; its No
+  // target (if any) is drawn as a side branch off the same row.
+  let current: Item | undefined = findGraphRoots(items)[0];
+
+  while (current && !placed.has(current.id)) {
+    const step: Item = current;
+    placed.add(step.id);
+    const decision = isDecisionStep(step.label);
     pushNode(step, centerX, decision ? "decisionNode" : "itemNode");
     if (prevId) link(prevId, step.id, undefined, prevHandle);
-    // A skip-No from an earlier decision merges forward into this step.
     flushMergesInto(step.id);
 
-    if (decision && step.children.length > 0) {
-      // Spine pattern: the FIRST child (the "Yes"/main path) continues straight
-      // down the center spine and the flow keeps going from it. The SECOND child
-      // (the "No") is one of three shapes, decided by its wording:
-      //   - terminal  → a dead-end off-ramp (decline, lost); no outgoing edge.
-      //   - skip      → bypasses the Yes step; merges into the NEXT spine step.
-      //   - exception → resolves, then loops back to the Yes box (the default).
-      const yesChild = step.children[0];
-      const noChild = step.children[1];
+    if (decision && step.connectsTo.length > 0) {
+      // Yes = the connection labeled "Yes", falling back to the first target
+      // for a doc that predates labels. No = the connection labeled "No",
+      // falling back to the second target.
+      const yesId: string | undefined =
+        step.connectsTo.find((id) => connectionLabel(step, id) === "Yes") ?? step.connectsTo[0];
+      const noId: string | undefined =
+        step.connectsTo.find((id) => connectionLabel(step, id) === "No") ??
+        step.connectsTo.find((id) => id !== yesId);
+      const yesChild = yesId ? byId.get(yesId) : undefined;
+      const noChild = noId ? byId.get(noId) : undefined;
 
-      // "Yes" — next box on the spine, directly below the decision.
-      y += STEP_H + V_GAP;
-      pushNode(yesChild, centerX, "itemNode");
-      link(step.id, yesChild.id, "Yes", "s-bottom", "t-top");
+      if (yesChild) {
+        y += STEP_H + V_GAP;
+        // The Yes box's own node/type is pushed by the loop's next iteration
+        // (via `current`), so a Yes target that is ITSELF a decision gets its
+        // own branches drawn instead of being flattened into a plain item.
+        link(step.id, yesChild.id, "Yes", "s-bottom", "t-top");
+      }
 
-      // "No" — box to the right, level with the decision's Yes child.
       if (noChild) {
         const terminal = isTerminalBranch(noChild.label);
         const skip = !terminal && isSkipBranch(noChild.label);
@@ -183,29 +193,33 @@ export function buildFlowchartLayout(roots: OutlineNode[], isDark: boolean): Flo
           width: STEP_W,
           style: { width: STEP_W, minHeight: STEP_H, zIndex: 1 },
         });
-        // Decision → No (out the right).
+        placed.add(noChild.id);
         link(step.id, noChild.id, "No", "s-right", "t-top");
         if (terminal) {
           // Dead-end: no outgoing edge.
-        } else if (skip) {
+        } else if (skip && yesChild) {
           // Bypass the Yes step — merge forward into the next spine step.
           pendingMerges.push(noChild.id);
-        } else {
+        } else if (yesChild) {
           // Recoverable exception: resolve, then rejoin at the Yes box.
           link(noChild.id, yesChild.id, undefined, "s-bottom", "t-right");
         }
       }
 
-      // Main flow continues from the Yes box.
-      prevId = yesChild.id;
-      prevHandle = "s-bottom";
-      y += STEP_H + V_GAP;
-      // Skip the normal increment at the bottom of the loop (already advanced).
-      continue;
+      if (yesChild) {
+        // The Yes edge is already drawn above (with its label), so the loop
+        // top's generic `if (prevId) link(...)` must stay silent for this
+        // node — hence prevId is cleared rather than pointed at step.id.
+        prevId = null;
+        current = yesChild;
+        continue;
+      }
+      current = undefined;
     } else {
       y += STEP_H + V_GAP;
       prevId = step.id;
       prevHandle = "s-bottom";
+      current = step.connectsTo.length > 0 ? byId.get(step.connectsTo[0]) : undefined;
     }
   }
 
@@ -216,21 +230,19 @@ const TL_W = 200;
 const TL_H = 72;
 const TL_GAP = 56;
 
-export function buildTimelineLayout(roots: OutlineNode[], isDark: boolean): FlowLayoutResult {
+export function buildTimelineLayout(items: Item[], isDark: boolean): FlowLayoutResult {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   const edgeColor = isDark ? "#cfae60" : "#426f62";
+  const ordered = [...items].sort((a, b) => a.order - b.order);
 
-  // Only top-level lines are milestones; any indented lines become a sub-note
-  // shown on the milestone label (kept simple — one level).
-  roots.forEach((m, i) => {
+  ordered.forEach((m, i) => {
     const x = i * (TL_W + TL_GAP);
-    const note = m.children.map((c) => c.label).join(" · ");
     nodes.push({
       id: m.id,
       type: "milestoneNode",
       position: { x, y: 0 },
-      data: { label: m.label, note },
+      data: { label: m.label, note: m.dateNote },
       draggable: false,
       selectable: false,
       width: TL_W,
@@ -238,7 +250,7 @@ export function buildTimelineLayout(roots: OutlineNode[], isDark: boolean): Flow
       style: { width: TL_W, height: TL_H, zIndex: 1 },
     });
     if (i > 0) {
-      const prev = roots[i - 1];
+      const prev = ordered[i - 1];
       edges.push({
         id: `e:${prev.id}->${m.id}`,
         source: prev.id,

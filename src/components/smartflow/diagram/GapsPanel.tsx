@@ -35,6 +35,12 @@ function head(label: string, count: number, tone?: "finding" | "todo") {
   );
 }
 
+/** " in Sales" for a named lane, or "" for a lane-less doc — the clause a
+ *  sentence tacks on only when there's a real lane to name. */
+function inLane(laneName: string): string {
+  return laneName ? ` in ${laneName}` : "";
+}
+
 /** One finding, written as a sentence with its context underneath. */
 function Finding({ sentence, context }: { sentence: string; context?: string }) {
   return (
@@ -47,7 +53,9 @@ function Finding({ sentence, context }: { sentence: string; context?: string }) 
 
 /** Handoffs grouped under the lane they belong to. Cross-lane handoffs
  *  get their own group — they belong to two lanes, so filing them under one
- *  would hide them from the other. */
+ *  would hide them from the other. A lane-less doc (every outline type) never
+ *  produces a crossing (there's nothing to cross), so it always collapses to
+ *  one flat, unnamed group instead of a "Between lanes" split. */
 function groupByLane(handoffs: HandoffFinding[]): { name: string; items: HandoffFinding[] }[] {
   const within = new Map<string, HandoffFinding[]>();
   const crossing: HandoffFinding[] = [];
@@ -62,11 +70,16 @@ function groupByLane(handoffs: HandoffFinding[]): { name: string; items: Handoff
   }
   const groups = [...within.entries()].map(([name, items]) => ({ name, items }));
   // Cross-lane first: a handoff between teams is where work actually gets lost.
-  return crossing.length > 0 ? [{ name: "Between lanes", items: crossing }, ...groups] : groups;
+  if (crossing.length > 0) return [{ name: "Between lanes", items: crossing }, ...groups];
+  // A single group with an empty name (the lane-less case) reads as unnamed
+  // noise in the UI — fold it down to one flat list instead of a labeled group.
+  if (groups.length === 1 && groups[0].name === "") return [{ name: "", items: groups[0].items }];
+  return groups;
 }
 
 export function GapsPanel({ doc, dispatch }: Props) {
   const gaps = useMemo(() => computeGaps(doc), [doc]);
+  const hasLanes = doc.lanes.length > 0;
 
   if (gaps.placedCount === 0) {
     return (
@@ -109,7 +122,7 @@ Set a handoff method on an arrow and every handoff collects here.
             <div className="sf-gap-groups">
               {handoffGroups.map((group) => (
                 <div key={group.name}>
-                  <div className="sf-gap-group-name">{group.name}</div>
+                  {group.name && <div className="sf-gap-group-name">{group.name}</div>}
                   <ul className="sf-gap-list">
                     {group.items.map((h) => (
                       <Finding
@@ -141,7 +154,7 @@ Steps carrying an unanswered question.
             <div className="sf-gap-groups">
               {gaps.openQuestions.map((group) => (
                 <div key={group.laneId}>
-                  <div className="sf-gap-group-name">{group.laneName}</div>
+                  {group.laneName && <div className="sf-gap-group-name">{group.laneName}</div>}
                   <ul className="sf-gap-list">
                     {group.items.map((q) => (
                       <Finding
@@ -173,7 +186,7 @@ Nothing keeps a record of these steps.
               {gaps.recordedNowhere.map((s) => (
                 <Finding
                   key={s.itemId}
-                  sentence={`${s.label} in ${s.laneName} keeps no record.`}
+                  sentence={`${s.label}${inLane(s.laneName)} keeps no record.`}
                 />
               ))}
             </ul>
@@ -197,7 +210,7 @@ Steps a department person pointed to as where it actually breaks.
               {gaps.breakPoints.map((b) => (
                 <Finding
                   key={b.itemId}
-                  sentence={`${b.label} in ${b.laneName} — ${b.note}`}
+                  sentence={`${b.label}${inLane(b.laneName)} — ${b.note}`}
                 />
               ))}
             </ul>
@@ -215,7 +228,9 @@ No systems named yet.
         ) : (
           <>
             <Text type="secondary" className="sf-gap-intro">
-Every system named across the lanes, and how many steps each one holds.
+              {hasLanes
+                ? "Every system named across the lanes, and how many steps each one holds."
+                : "Every system named, and how many steps each one holds."}
             </Text>
             <ul className="sf-gap-list">
               {gaps.systemInventory.map((s) => (
@@ -243,51 +258,59 @@ No step leads to these, and these lead nowhere.
               {gaps.orphans.map((o) => (
                 <Finding
                   key={o.itemId}
-                  sentence={`${o.label} in ${o.laneName} has no step before or after.`}
+                  sentence={`${o.label}${inLane(o.laneName)} has no step before or after.`}
                 />
               ))}
             </ul>
           </>
         ),
     },
-    {
-      key: "lane-edges",
-      label: head("Where lanes connect", gaps.laneEdges.length),
-      children: (
-        <>
-          <Text type="secondary" className="sf-gap-intro">
-These are the points where one lane depends on another.
-          </Text>
-          <div className="sf-gap-groups">
-            {gaps.laneEdges.map((lane) => (
-              <div key={lane.laneId}>
-                <div className="sf-gap-group-name">{lane.laneName}</div>
-                {lane.entries.length === 0 && lane.exits.length === 0 ? (
-                  <Text type="secondary" style={{ fontSize: "var(--ops-fs-fine)" }}>
-No step crosses into this lane or out of it.
-                  </Text>
-                ) : (
-                  <ul className="sf-gap-list">
-                    {lane.entries.map((e) => (
-                      <Finding
-                        key={`in-${e.itemId}-${e.fromLane}`}
-                        sentence={`${e.label} receives work from ${e.fromLane}.`}
-                      />
-                    ))}
-                    {lane.exits.map((e) => (
-                      <Finding
-                        key={`out-${e.itemId}-${e.toLane}`}
-                        sentence={`${e.label} sends work to ${e.toLane}.`}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      ),
-    },
+    // "Where lanes connect" only means something when there are lanes to
+    // cross — a lane-less doc (every outline type) always computes zero of
+    // these, so the section is dropped entirely rather than shown as an
+    // always-empty "0" that looks like a broken feature.
+    ...(hasLanes
+      ? [
+          {
+            key: "lane-edges",
+            label: head("Where lanes connect", gaps.laneEdges.length),
+            children: (
+              <>
+                <Text type="secondary" className="sf-gap-intro">
+                  These are the points where one lane depends on another.
+                </Text>
+                <div className="sf-gap-groups">
+                  {gaps.laneEdges.map((lane) => (
+                    <div key={lane.laneId}>
+                      <div className="sf-gap-group-name">{lane.laneName}</div>
+                      {lane.entries.length === 0 && lane.exits.length === 0 ? (
+                        <Text type="secondary" style={{ fontSize: "var(--ops-fs-fine)" }}>
+                          No step crosses into this lane or out of it.
+                        </Text>
+                      ) : (
+                        <ul className="sf-gap-list">
+                          {lane.entries.map((e) => (
+                            <Finding
+                              key={`in-${e.itemId}-${e.fromLane}`}
+                              sentence={`${e.label} receives work from ${e.fromLane}.`}
+                            />
+                          ))}
+                          {lane.exits.map((e) => (
+                            <Finding
+                              key={`out-${e.itemId}-${e.toLane}`}
+                              sentence={`${e.label} sends work to ${e.toLane}.`}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ),
+          },
+        ]
+      : []),
   ];
 
   // --- Your to-do list: gaps in the INTERVIEW, not in their process. ---------
@@ -332,7 +355,7 @@ Blank just means you haven&apos;t filled it in yet.
               {gaps.systemNotAsked.map((s) => (
                 <Finding
                   key={s.itemId}
-                  sentence={`${s.label} — ${s.laneName}`}
+                  sentence={s.laneName ? `${s.label} — ${s.laneName}` : s.label}
                 />
               ))}
             </ul>

@@ -79,14 +79,3 @@ export function parseOutline(text: string, idFor: (i: number) => string = (i) =>
 
   return roots;
 }
-
-/** Flatten a forest back to a list in pre-order (parent before its children). */
-export function flattenOutline(roots: OutlineNode[]): OutlineNode[] {
-  const out: OutlineNode[] = [];
-  const walk = (n: OutlineNode) => {
-    out.push(n);
-    n.children.forEach(walk);
-  };
-  roots.forEach(walk);
-  return out;
-}

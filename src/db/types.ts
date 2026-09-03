@@ -14,8 +14,9 @@ export interface Flow {
   name: string;
   createdAt: number;
   updatedAt: number;
-  /** Swimlane carries the rich doc; every outline type carries its pasted text. */
-  content: SmartFlowDoc | string;
+  /** Every diagram type stores the same doc shape — lanes are simply empty
+   *  for the four outline types. */
+  content: SmartFlowDoc;
 }
 
 export const DB_NAME = "smart-flow";
@@ -23,10 +24,10 @@ export const DB_VERSION = 1;
 export const FLOWS_STORE = "flows";
 
 /**
- * What one row sends over the Opsette bridge. `content` alone isn't
- * self-describing — every outline type (flowchart, decision-tree, org-tree,
- * timeline) stores a plain string, indistinguishable from each other by
- * shape — so `type` and `name` ride along too, or a hydrated row can't be
- * rendered correctly. See docs/SMARTFLOW_STORAGE_PLAN.md §5.
+ * What one row sends over the Opsette bridge. Every type now stores the same
+ * doc shape, but `content` alone still can't say which diagram type it is or
+ * what to call it — `type` and `name` ride along so a hydrated row renders
+ * with the right layout function under the right name. See
+ * docs/SMARTFLOW_STORAGE_PLAN.md §5.
  */
 export type BridgedFlowValue = Pick<Flow, "type" | "name" | "content">;

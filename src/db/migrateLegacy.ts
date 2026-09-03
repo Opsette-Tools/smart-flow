@@ -7,6 +7,7 @@
  */
 
 import { diagramInfo, type DiagramType } from "@/components/smartflow/diagramTypes";
+import { outlineTextToDoc } from "@/components/smartflow/outlineImport";
 import type { CardPosition, PersistedDoc, SmartFlowDoc } from "@/components/smartflow/types";
 import { flowsRepo } from "./flowsRepo";
 
@@ -101,7 +102,8 @@ export async function migrateLegacyIfNeeded(): Promise<string | null> {
   const outlineTexts = readLegacyOutlineTexts();
   for (const [type, text] of Object.entries(outlineTexts) as [OutlineType, string][]) {
     if (!text?.trim()) continue;
-    const flow = await flowsRepo.create({ type, name: diagramInfo(type).name, content: text });
+    const content = outlineTextToDoc(type, text);
+    const flow = await flowsRepo.create({ type, name: diagramInfo(type).name, content });
     if (activeType === type) activeFlowId = flow.id;
   }
 

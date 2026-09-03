@@ -76,7 +76,11 @@ export function ChartsPanel({ doc }: Props) {
       <section className="sf-charts">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="Place some steps in lanes and the charts show up here."
+          description={
+            doc.lanes.length === 0
+              ? "Add steps and the charts show up here."
+              : "Place some steps in lanes and the charts show up here."
+          }
         />
       </section>
     );
