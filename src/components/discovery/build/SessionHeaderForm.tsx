@@ -9,7 +9,11 @@ const { TextArea } = Input;
 // Stored as plain strings (SessionHeader.date / .recordingStart) so the doc
 // stays JSON-plain and doesn't carry a dayjs instance — these two converters
 // are the only place that boundary is crossed, in either direction.
+// DATE_FORMAT is the storage format (sorts correctly, unambiguous) — kept
+// separate from DATE_DISPLAY_FORMAT so existing sessions' stored dates keep
+// parsing correctly even though the field now shows month first.
 const DATE_FORMAT = "YYYY-MM-DD";
+const DATE_DISPLAY_FORMAT = "MM/DD/YYYY";
 const TIME_FORMAT = "h:mm A";
 
 interface Props {
@@ -43,6 +47,7 @@ export function SessionHeaderForm({ header, dispatch }: Props) {
         <DatePicker
           value={header.date ? dayjs(header.date, DATE_FORMAT) : null}
           onChange={(value) => set({ date: value ? value.format(DATE_FORMAT) : "" })}
+          format={DATE_DISPLAY_FORMAT}
           style={{ maxWidth: 200 }}
         />
       </section>

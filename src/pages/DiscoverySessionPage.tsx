@@ -5,16 +5,20 @@ import {
   FileTextOutlined,
   OrderedListOutlined,
   TableOutlined,
+  ReadOutlined,
   MoreOutlined,
   EditOutlined,
   CopyOutlined,
   DeleteOutlined,
   ExportOutlined,
+  FilePdfOutlined,
 } from "@ant-design/icons";
 import { reducer, emptyDoc } from "@/components/discovery/store";
 import { SessionHeaderForm } from "@/components/discovery/build/SessionHeaderForm";
 import { StepListPanel } from "@/components/discovery/build/StepListPanel";
 import { SideTablesPanel } from "@/components/discovery/build/SideTablesPanel";
+import { DiscoverySummary } from "@/components/discovery/build/DiscoverySummary";
+import { DiscoveryExportModal } from "@/components/discovery/build/DiscoveryExportModal";
 import { discoverySessionsRepo } from "@/db/discoverySessionsRepo";
 import type { DiscoverySession } from "@/db/discoveryTypes";
 import { setActiveDiscoverySessionId } from "@/lib/activeDiscoverySession";
@@ -23,7 +27,7 @@ import { discoveryExportFileName, serializeDiscoveryExport } from "@/lib/discove
 import { triggerDownload } from "@/lib/flowExport";
 
 const { Text } = Typography;
-type ViewMode = "header" | "steps" | "tables";
+type ViewMode = "header" | "steps" | "tables" | "summary";
 
 // Free against local IndexedDB — same debounce as the flow autosave.
 const AUTOSAVE_DEBOUNCE_MS = 300;
@@ -42,6 +46,7 @@ export default function DiscoverySessionPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("steps");
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
   const loadedIdRef = useRef<string | null>(null);
   const latestRef = useRef({ session, doc });
@@ -170,13 +175,15 @@ export default function DiscoverySessionPage() {
               items: [
                 { key: "rename", label: "Rename", icon: <EditOutlined /> },
                 { key: "duplicate", label: "Duplicate", icon: <CopyOutlined /> },
-                { key: "export", label: "Export", icon: <ExportOutlined /> },
+                { key: "export", label: "Export JSON", icon: <ExportOutlined /> },
+                { key: "pdf", label: "Save as PDF", icon: <FilePdfOutlined /> },
                 { key: "delete", label: "Delete", icon: <DeleteOutlined />, danger: true },
               ],
               onClick: ({ key }) => {
                 if (key === "rename") openRename();
                 if (key === "duplicate") handleDuplicate();
                 if (key === "export") handleExport();
+                if (key === "pdf") setExportOpen(true);
                 if (key === "delete") handleDelete();
               },
             }}
@@ -191,6 +198,7 @@ export default function DiscoverySessionPage() {
             { label: "Header", value: "header", icon: <FileTextOutlined /> },
             { label: "Steps", value: "steps", icon: <OrderedListOutlined /> },
             { label: "Tables", value: "tables", icon: <TableOutlined /> },
+            { label: "Summary", value: "summary", icon: <ReadOutlined /> },
           ]}
         />
       </div>
@@ -199,13 +207,24 @@ export default function DiscoverySessionPage() {
         <SessionHeaderForm header={doc.header} dispatch={dispatch} />
       ) : viewMode === "steps" ? (
         <StepListPanel doc={doc} dispatch={dispatch} />
-      ) : (
+      ) : viewMode === "tables" ? (
         <SideTablesPanel doc={doc} dispatch={dispatch} />
+      ) : (
+        <section className="sf-discovery-summary-page">
+          <div className="sf-discovery-summary-toolbar">
+            <Button type="primary" icon={<FilePdfOutlined />} onClick={() => setExportOpen(true)}>
+              Preview & save PDF
+            </Button>
+          </div>
+          <DiscoverySummary doc={doc} />
+        </section>
       )}
 
       <Modal open={renaming} title="Rename session" onCancel={() => setRenaming(false)} onOk={submitRename} okText="Save">
         <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onPressEnter={submitRename} autoFocus maxLength={80} />
       </Modal>
+
+      <DiscoveryExportModal open={exportOpen} onClose={() => setExportOpen(false)} doc={doc} sessionName={session.name} />
     </>
   );
 }

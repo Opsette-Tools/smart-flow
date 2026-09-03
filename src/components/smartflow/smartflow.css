@@ -2094,3 +2094,270 @@ html.dark .sf-side-table-row {
     min-width: 0;
   }
 }
+
+/* ===================================================================
+   Discovery session — Summary tab
+   Read-only, one-flowing-document render of a capture sheet (see
+   DiscoverySummary.tsx). Same document-page shape as .sf-findings-page:
+   capped reading width, toolbar pinned above it. This is also the exact
+   DOM printDiscovery.ts clones for "Save as PDF" — the print stylesheet
+   there is self-contained and doesn't read these rules.
+   =================================================================== */
+.sf-discovery-summary-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+.sf-discovery-summary-toolbar,
+.sf-discovery-summary {
+  max-width: 900px;
+  width: 100%;
+  margin-inline: auto;
+}
+.sf-discovery-summary-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sf-summary-section {
+  margin-bottom: var(--ops-space-lg, 24px);
+}
+
+/* Process name — the document's real headline. Bold, large, set off with a
+   rule so it reads as a title rather than another paragraph. */
+.sf-summary-heading {
+  font-size: 26px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--sf-border-strong, #1a1a1a);
+}
+html.dark .sf-summary-heading {
+  --sf-border-strong: #e8e8e8;
+}
+
+/* Section headings (Steps, Artifacts, Decision rules, Glossary, Exceptions,
+   Volume) — bumped well past body/label size, ruled underneath, generous
+   top margin so each section reads as a real break, not a bigger word above
+   the same list. */
+.sf-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 28px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sf-border, #ddd);
+}
+html.dark .sf-section-title {
+  --sf-border: #333;
+}
+.sf-summary-section:first-of-type + .sf-summary-section .sf-section-title,
+.sf-summary-section-header + .sf-summary-section .sf-section-title {
+  margin-top: 0;
+}
+
+.sf-summary-empty {
+  display: block;
+  padding: 4px 0;
+}
+
+/* ---- Fact row: "Label   value", the one shared shape for header facts,
+   step facts, and side-table facts. Label is a fixed-width column so a
+   value that wraps indents under itself instead of colliding back under the
+   label on the line above. */
+.sf-summary-fact-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  column-gap: var(--ops-space-md);
+  font-size: var(--ops-fs-fine);
+  margin-bottom: 4px;
+}
+.sf-summary-fact-label {
+  color: #888;
+  font-weight: 600;
+}
+html.dark .sf-summary-fact-label {
+  color: #9a9a9a;
+}
+.sf-summary-header-facts {
+  margin-top: 4px;
+}
+.sf-summary-attendees {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 575px) {
+  .sf-summary-fact-row {
+    grid-template-columns: 1fr;
+    row-gap: 1px;
+  }
+}
+
+/* ---- Steps ---- */
+.sf-summary-steps {
+  display: flex;
+  flex-direction: column;
+}
+.sf-summary-step {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sf-border, #ececec);
+}
+html.dark .sf-summary-step {
+  --sf-border: #2a2a2a;
+}
+.sf-summary-steps .sf-summary-step:first-child {
+  padding-top: 0;
+}
+.sf-summary-step:last-child {
+  border-bottom: none;
+}
+.sf-summary-step-head {
+  margin-bottom: 8px;
+}
+.sf-summary-step-label {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 750;
+  padding: 2px 10px;
+  border: 1.5px solid var(--sf-border-strong, #1a1a1a);
+  border-radius: 6px;
+}
+html.dark .sf-summary-step-label {
+  --sf-border-strong: #e8e8e8;
+}
+
+.sf-summary-pain-tag {
+  display: inline-block;
+  font-size: var(--ops-fs-fine);
+  color: #8a4b00;
+  background: #fdf2e0;
+  border: 1px solid #d99a3a;
+  border-radius: 4px;
+  padding: 1px 8px;
+}
+html.dark .sf-summary-pain-tag {
+  color: #e0a94f;
+  background: #2a2013;
+  border-color: #6b4a1a;
+}
+
+.sf-summary-backfill {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dotted var(--sf-border, #ccc);
+}
+
+/* ---- Side tables (Artifacts, Decision rules, Glossary, Exceptions,
+   Volume) ---- */
+.sf-summary-side-rows {
+  display: flex;
+  flex-direction: column;
+}
+.sf-summary-side-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sf-border, #ececec);
+}
+html.dark .sf-summary-side-row {
+  --sf-border: #2a2a2a;
+}
+.sf-summary-side-rows .sf-summary-side-row:first-child {
+  padding-top: 0;
+}
+.sf-summary-side-row:last-child {
+  border-bottom: none;
+}
+.sf-summary-side-primary {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+/* ---- Export modal (DiscoveryExportModal) ----
+   Same "preview before you commit" shape as Palette Studio's ExportPanel
+   modal: a section picker on the left, a toolbar + scrollable preview pane
+   on the right holding the exact content that gets printed. No ScaledPreview
+   transform here — DiscoverySummary is a flowing document, not a
+   fixed-width artboard, so it just renders at natural width in the scroll
+   box. */
+.sf-discovery-export-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ops-space-sm);
+  margin-bottom: var(--ops-space-md);
+}
+.sf-discovery-export-preview {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding: var(--ops-space-lg, 24px);
+  background: var(--sf-export-bg, #f7f7f7);
+  border: 1px solid var(--sf-border, #e6e6e6);
+  border-radius: var(--ops-radius-md, 8px);
+}
+html.dark .sf-discovery-export-preview {
+  --sf-export-bg: #161616;
+  --sf-border: #2a2a2a;
+}
+
+/* Section picker column */
+.sf-discovery-export-picker {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sf-discovery-export-picker-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 10px;
+}
+html.dark .sf-discovery-export-picker-label {
+  color: #9a9a9a;
+}
+.sf-discovery-export-picker-item {
+  padding: 6px 0;
+}
+.sf-discovery-export-picker-fixed .ant-checkbox-disabled + span {
+  color: inherit;
+}
+
+/* The Steps row is an antd Collapse panel dressed to look like the plain
+   checkbox rows around it — no card background/border, just a disclosure
+   arrow for the per-step list. */
+.sf-discovery-export-steps-collapse.ant-collapse {
+  background: transparent;
+  border: none;
+}
+.sf-discovery-export-steps-collapse .ant-collapse-item {
+  border: none;
+}
+.sf-discovery-export-steps-collapse .ant-collapse-header {
+  padding: 6px 0 !important;
+  align-items: center !important;
+}
+.sf-discovery-export-steps-collapse .ant-collapse-content-box {
+  padding: 4px 0 4px 24px !important;
+}
+.sf-discovery-export-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sf-discovery-export-steps-list .ant-checkbox-wrapper {
+  font-size: var(--ops-fs-fine);
+}
+.sf-discovery-export-steps-list > .ant-checkbox-wrapper:first-child {
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--sf-border, #ececec);
+}
+html.dark .sf-discovery-export-steps-list > .ant-checkbox-wrapper:first-child {
+  --sf-border: #2a2a2a;
+}
+
+@media (max-width: 767px) {
+  .sf-discovery-export-picker {
+    max-height: none;
+  }
+}
