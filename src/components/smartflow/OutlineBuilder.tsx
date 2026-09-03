@@ -27,7 +27,7 @@ import { StepInspector } from "./build/StepInspector";
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-type OutlineType = Exclude<DiagramType, "swimlane">;
+type OutlineType = Exclude<DiagramType, "swimlane" | "schema">;
 
 interface Props {
   type: OutlineType;

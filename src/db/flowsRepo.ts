@@ -9,7 +9,9 @@ import { openDB, type IDBPDatabase } from "idb";
 import { uuid } from "@/lib/uuid";
 import { diagramInfo, type DiagramType } from "@/components/smartflow/diagramTypes";
 import { emptyDoc } from "@/components/smartflow/store";
+import { emptySchemaDoc } from "@/components/smartflow/schema/types";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
+import type { SchemaDoc } from "@/components/smartflow/schema/types";
 import {
   forgetParentKnown,
   getBridgeInstance,
@@ -68,7 +70,7 @@ export const flowsRepo = {
   async create(opts: {
     type: DiagramType;
     name?: string;
-    content?: SmartFlowDoc;
+    content?: SmartFlowDoc | SchemaDoc;
   }): Promise<Flow> {
     const db = await getDb();
     const now = Date.now();
@@ -78,14 +80,14 @@ export const flowsRepo = {
       name: opts.name?.trim() || `Untitled ${diagramInfo(opts.type).name}`,
       createdAt: now,
       updatedAt: now,
-      content: opts.content ?? emptyDoc,
+      content: opts.content ?? (opts.type === "schema" ? emptySchemaDoc : emptyDoc),
     };
     await db.put(FLOWS_STORE, flow);
     persistToBridge(flow);
     return flow;
   },
 
-  async updateContent(id: string, content: SmartFlowDoc): Promise<void> {
+  async updateContent(id: string, content: SmartFlowDoc | SchemaDoc): Promise<void> {
     const db = await getDb();
     const existing = (await db.get(FLOWS_STORE, id)) as Flow | undefined;
     if (!existing) return;

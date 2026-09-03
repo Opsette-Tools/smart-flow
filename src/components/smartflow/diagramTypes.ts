@@ -7,7 +7,13 @@
  * by what they're trying to show — not by knowing diagram names.
  */
 
-export type DiagramType = "flowchart" | "swimlane" | "decision-tree" | "org-tree" | "timeline";
+export type DiagramType =
+  | "flowchart"
+  | "swimlane"
+  | "decision-tree"
+  | "org-tree"
+  | "timeline"
+  | "schema";
 
 export interface DiagramTypeInfo {
   type: DiagramType;
@@ -56,6 +62,13 @@ export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
     blurb: "Steps or milestones laid out by when they happen.",
     chooserAnswer: "Things laid out by when they happen — a schedule or roadmap",
     inputHint: "Paste milestones in order, one per line, optionally with a date.",
+  },
+  {
+    type: "schema",
+    name: "Schema Designer",
+    blurb: "Tables and fields, with the relationships between them.",
+    chooserAnswer: "I want to design a database, or the fields for a board or spreadsheet",
+    inputHint: "Add a table, then add columns to it. Drag between columns to connect them.",
   },
 ];
 

@@ -19,12 +19,14 @@ import { DiagramView } from "@/components/smartflow/diagram/DiagramView";
 import { SchemaMapView } from "@/components/smartflow/schemamap/SchemaMapView";
 import { OutlineBuilder } from "@/components/smartflow/OutlineBuilder";
 import type { DiagramType } from "@/components/smartflow/diagramTypes";
+import type { SmartFlowDoc } from "@/components/smartflow/types";
 import { flowsRepo } from "@/db/flowsRepo";
 import type { Flow } from "@/db/types";
 import { setActiveFlowId } from "@/lib/activeFlow";
 import { isBridgeMode } from "@/lib/bridgeInstance";
 import { useFlows } from "@/layout/FlowsContext";
 import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
+import { SchemaFlowPage } from "./SchemaFlowPage";
 
 const { Text } = Typography;
 type ViewMode = "build" | "diagram" | "charts" | "map";
@@ -82,7 +84,14 @@ export default function FlowPage() {
       }
       setFlow(f);
       loadedIdRef.current = f.id;
-      dispatch({ type: "REPLACE_DOC", doc: f.content });
+      // A schema flow's content is a SchemaDoc, not a SmartFlowDoc — it never
+      // reaches this reducer. SchemaFlowPage (rendered below, before any of
+      // this component's own JSX) owns its own reducer and its own load. The
+      // cast is safe: the runtime check just confirmed `f.type`, which is
+      // what SchemaFlowPage's early return (further down this component)
+      // also keys on — TS can't correlate the two independently-typed fields
+      // through this closure on its own.
+      if (f.type !== "schema") dispatch({ type: "REPLACE_DOC", doc: f.content as SmartFlowDoc });
       setActiveFlowId(f.id);
     });
     return () => {
@@ -90,14 +99,18 @@ export default function FlowPage() {
     };
   }, [id]);
 
-  // Autosave. Every diagram type shares one doc shape now, so one effect
-  // covers all of them. Skipped until this flow's own row has loaded so the
-  // reducer's initial emptyDoc can never clobber a real saved board mid-
-  // navigation. Standard debounce: a superseded timer is cleared, not fired
-  // early — the flush-on-unmount effect below covers the case where the page
-  // leaves before the timer would have fired.
+  // Autosave. Every SmartFlowDoc-backed diagram type shares one doc shape, so
+  // one effect covers all of them. Skipped until this flow's own row has
+  // loaded so the reducer's initial emptyDoc can never clobber a real saved
+  // board mid-navigation. Standard debounce: a superseded timer is cleared,
+  // not fired early — the flush-on-unmount effect below covers the case
+  // where the page leaves before the timer would have fired. Schema flows
+  // never reach this effect (see the early return below, before this
+  // component's own JSX) — SchemaFlowPage owns its own autosave against its
+  // own reducer, so this effect writing SmartFlowDoc's still-empty `doc` over
+  // real schema content is not a live risk, but the guard stays anyway.
   useEffect(() => {
-    if (!flow || loadedIdRef.current !== flow.id) return;
+    if (!flow || flow.type === "schema" || loadedIdRef.current !== flow.id) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     const debounceMs = isBridgeMode() ? AUTOSAVE_DEBOUNCE_BRIDGED_MS : AUTOSAVE_DEBOUNCE_STANDALONE_MS;
     saveTimer.current = window.setTimeout(() => {
@@ -149,7 +162,14 @@ export default function FlowPage() {
 
   const handleExport = () => {
     if (!flow) return;
-    const json = serializeFlowExport(flow);
+    // `flow` (React state) only updates on load/rename — the live doc lives
+    // in the `useReducer` above and is written to IndexedDB by the autosave
+    // effect, but never copied back into `flow`. Pre-existing bug, found
+    // while building the schema designer's equivalent export path: exporting
+    // used to serialize `flow.content`, frozen at whatever the doc looked
+    // like on page load, silently dropping every edit made since. Serialize
+    // the CURRENT doc instead.
+    const json = serializeFlowExport({ ...flow, content: doc });
     triggerDownload(new Blob([json], { type: "application/json" }), flowExportFileName(flow.name));
   };
 
@@ -187,6 +207,12 @@ export default function FlowPage() {
         </Button>
       </div>
     );
+  }
+
+  if (flow.type === "schema") {
+    // Own page, own reducer, own SchemaDoc — see SchemaFlowPage's doc comment
+    // for why this isn't a fifth branch inside this component's own JSX.
+    return <SchemaFlowPage id={flow.id} flow={flow} />;
   }
 
   return (
@@ -243,7 +269,7 @@ export default function FlowPage() {
         flow.type === "swimlane" ? (
           <BuildMode doc={doc} dispatch={dispatch} />
         ) : (
-          <OutlineBuilder type={flow.type as Exclude<DiagramType, "swimlane">} doc={doc} dispatch={dispatch} />
+          <OutlineBuilder type={flow.type as Exclude<DiagramType, "swimlane" | "schema">} doc={doc} dispatch={dispatch} />
         )
       ) : viewMode === "map" ? (
         <SchemaMapView doc={doc} dispatch={dispatch} />

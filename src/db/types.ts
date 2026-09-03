@@ -6,6 +6,7 @@
  */
 
 import type { DiagramType } from "@/components/smartflow/diagramTypes";
+import type { SchemaDoc } from "@/components/smartflow/schema/types";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
 
 export interface Flow {
@@ -14,9 +15,11 @@ export interface Flow {
   name: string;
   createdAt: number;
   updatedAt: number;
-  /** Every diagram type stores the same doc shape — lanes are simply empty
-   *  for the four outline types. */
-  content: SmartFlowDoc;
+  /** The five process-diagram types share SmartFlowDoc (lanes empty for the
+   *  four outline types). "schema" carries a structurally unrelated SchemaDoc
+   *  instead — a real discriminated union on `type`, not a lossy stand-in for
+   *  one shape by the other. See docs/SCHEMA-DESIGNER-PLAN.md §2. */
+  content: SmartFlowDoc | SchemaDoc;
 }
 
 export const DB_NAME = "smart-flow";

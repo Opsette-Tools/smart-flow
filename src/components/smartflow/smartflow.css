@@ -1631,3 +1631,370 @@ html.dark .sf-review-step-head:hover .sf-review-step-go {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* ── Schema designer canvas ──────────────────────────────────────────
+   Deliberately its own visual language, not the schema map recolored —
+   see docs/SCHEMA-DESIGNER-PLAN.md §6. Orthogonal lines instead of
+   beziers, a dense typed-column grid instead of a discovery-notes card. */
+
+.sf-schema-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+
+.sf-schema-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ops-space-md);
+  flex-wrap: wrap;
+}
+.sf-schema-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sf-schema-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sf-schema-building-for {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sf-schema-frame {
+  position: relative;
+  height: clamp(520px, 78vh, 1000px);
+  border: 1px solid var(--sf-border, #e8e8e8);
+  border-radius: var(--ops-radius);
+  overflow: hidden;
+  background: var(--sf-canvas, #fafafa);
+  background-image: radial-gradient(var(--sf-dot, #dedede) 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+html.dark .sf-schema-frame {
+  --sf-border: #2a2a2a;
+  --sf-canvas: #0e0e0e;
+  --sf-dot: #232323;
+}
+
+.sf-schema-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.sf-schema-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.sf-schema-lines foreignObject {
+  pointer-events: auto;
+}
+
+.sf-schema-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sf-schema-card {
+  position: absolute;
+  background: var(--sf-card-bg, #fff);
+  border: 1px solid var(--sf-border, #e2e2e2);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+html.dark .sf-schema-card {
+  --sf-card-bg: #1a1a1a;
+  --sf-border: #2f2f2f;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.sf-schema-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 4px;
+  cursor: grab;
+}
+.sf-schema-card-menu {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 0;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.sf-schema-card-menu:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+.sf-schema-card-head:active {
+  cursor: grabbing;
+}
+.sf-schema-card-name {
+  flex: 1;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-schema-card-delete {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 4px;
+}
+.sf-schema-card-delete:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sf-schema-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-top: 1px solid var(--sf-border, #eee);
+  font-size: 12.5px;
+}
+html.dark .sf-schema-row {
+  --sf-border: #262626;
+}
+.sf-schema-row-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sf-dot-fill, #b8b8b8);
+  flex-shrink: 0;
+  cursor: crosshair;
+}
+.sf-schema-row-dot:hover {
+  background: var(--ops-green);
+}
+.sf-schema-row-flags-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  flex-shrink: 0;
+}
+.sf-schema-row-key {
+  color: var(--sf-muted, #c2c2c2);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+/* Gold once actually set as a primary key — muted grey otherwise, so the
+   flags trigger doesn't read as "already a key" on every untouched row. */
+.sf-schema-row-key.is-set {
+  color: var(--ops-gold, #a5843b);
+}
+.sf-schema-row-name {
+  flex: 1;
+  /* min-width: 0 is load-bearing here — without it a flex item won't shrink
+     below its own content's natural width, so the name was losing the
+     shrink fight to the type label (flex-shrink: 0 below) and truncating
+     far more aggressively than it needed to. The field NAME is what a
+     builder actually needs to read; the type label is secondary and gets
+     its own bounded truncation instead. See docs/SCHEMA-DESIGNER-PLAN.md
+     progress notes, 2026-09-03, for the real-table screenshot that
+     surfaced this. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+.sf-schema-row-name-input {
+  flex: 1;
+  min-width: 0;
+}
+/* Right-aligned, muted, uppercase — the alignment that makes a DrawDB-style
+   card read as a scannable data grid instead of a text list. Shows the
+   canonical human-readable label (Text/Number/Select…) or, once a target is
+   set, that target's own name — which runs noticeably longer ("Single line
+   text", "Multiple select") than the neutral one, so this gets its own
+   bounded max-width + truncation rather than reclaiming space from the
+   name column. */
+.sf-schema-row-type {
+  border: none;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+.sf-schema-row-type:hover {
+  opacity: 1;
+}
+.sf-schema-row-delete {
+  border: none;
+  background: transparent;
+  color: var(--sf-muted, #b0b0b0);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  flex-shrink: 0;
+  opacity: 0;
+}
+.sf-schema-row:hover .sf-schema-row-delete {
+  opacity: 1;
+}
+.sf-schema-row-delete:hover {
+  color: #c0392b;
+}
+
+.sf-schema-add-column {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  border-top: 1px dashed var(--sf-border, #e2e2e2);
+  background: transparent;
+  color: var(--sf-muted, #999);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 8px;
+}
+.sf-schema-add-column:hover {
+  color: var(--ops-green);
+  background: rgba(47, 79, 70, 0.05);
+}
+
+.sf-schema-rel-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--sf-border, #ddd);
+  background: var(--sf-card-bg, #fff);
+  color: var(--sf-muted, #999);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sf-schema-lines:hover .sf-schema-rel-delete,
+.sf-schema-rel-delete:hover {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .sf-schema-frame {
+    height: clamp(420px, 70vh, 800px);
+  }
+}
+
+/* Capability-note UI — surfaced live, never backloaded to export. */
+.sf-schema-type-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sf-schema-type-menu-target {
+  font-size: 11px;
+  color: var(--sf-muted, #999);
+}
+.sf-schema-type-menu-warn {
+  color: #c07a2a;
+  font-size: 12px;
+}
+.sf-schema-row-warn {
+  color: #c07a2a;
+  font-size: 11px;
+  flex-shrink: 0;
+  cursor: help;
+}
+.sf-schema-row-options-btn {
+  border: none;
+  background: transparent;
+  color: var(--sf-muted, #999);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  flex-shrink: 0;
+}
+.sf-schema-row-options-btn:hover {
+  color: var(--ops-green);
+}
+
+/* Select/multi-select options editor. Content only — antd's Popover (which
+   wraps this, in SchemaCanvas.tsx) owns positioning and portals to
+   document.body, escaping .sf-schema-card's `overflow: hidden` that
+   silently clipped an earlier hand-rolled absolutely-positioned version. */
+.sf-schema-options-content {
+  width: 220px;
+}
+.sf-schema-options-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.sf-schema-options-head .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.sf-schema-options-close {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--sf-muted, #999);
+  padding: 0 2px;
+}
+.sf-schema-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+}
+.sf-schema-option-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sf-schema-option-add {
+  display: flex;
+  gap: 4px;
+}

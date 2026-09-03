@@ -11,6 +11,7 @@
  */
 
 import type { DiagramType } from "@/components/smartflow/diagramTypes";
+import type { SchemaDoc } from "@/components/smartflow/schema/types";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
 import type { Flow } from "@/db/types";
 
@@ -23,7 +24,7 @@ interface SmartFlowExportFile {
   flow: {
     type: DiagramType;
     name: string;
-    content: SmartFlowDoc;
+    content: SmartFlowDoc | SchemaDoc;
   };
 }
 
@@ -45,10 +46,10 @@ export function flowExportFileName(name: string): string {
 export interface ParsedFlowImport {
   type: DiagramType;
   name: string;
-  content: SmartFlowDoc;
+  content: SmartFlowDoc | SchemaDoc;
 }
 
-const VALID_TYPES: DiagramType[] = ["flowchart", "swimlane", "decision-tree", "org-tree", "timeline"];
+const VALID_OUTLINE_TYPES: DiagramType[] = ["flowchart", "swimlane", "decision-tree", "org-tree", "timeline"];
 
 /** True for a plain swimlane doc — the shape `db/migrateLegacy.ts` already
  *  trusts, and what the raw `localStorage.getItem('smart-flow-doc')` backup
@@ -61,13 +62,27 @@ function isLikelySmartFlowDoc(v: unknown): v is Record<string, unknown> {
   return Array.isArray(d.lanes) && Array.isArray(d.items);
 }
 
+/** True for a SchemaDoc — checked by the shape only `schema`-type flows
+ *  ever write (`tables`/`relationships` arrays), same spirit as
+ *  isLikelySmartFlowDoc's `lanes`/`items` check above. */
+function isLikelySchemaDoc(v: unknown): v is Record<string, unknown> {
+  if (typeof v !== "object" || v === null) return false;
+  const d = v as Record<string, unknown>;
+  return Array.isArray(d.tables) && Array.isArray(d.relationships);
+}
+
 /** Parse an imported file's text. Accepts either shape:
  *   1. A real Export from this app's own "Export" action:
  *      { type: "opsette-smartflow-flow", v: 1, flow: { type, name, content } }
+ *      `content` is a SmartFlowDoc for the five process-diagram types, or a
+ *      SchemaDoc for "schema" — checked by shape, not trusted from `type`
+ *      alone, so a hand-edited or mismatched file fails cleanly instead of
+ *      importing the wrong doc shape into the wrong reducer.
  *   2. The raw legacy swimlane doc, wrapped or bare:
  *      { v: 1 | 2, doc: { lanes, items, ... } }  — or just { lanes, items, ... }
  *      This is what the manual backup snippet (localStorage.getItem
  *      ('smart-flow-doc')) downloads directly, with no envelope at all.
+ *      Always a swimlane doc — this format predates every other type.
  *  Null if it's neither. */
 export function parseFlowImport(text: string): ParsedFlowImport | null {
   let raw: unknown;
@@ -79,12 +94,16 @@ export function parseFlowImport(text: string): ParsedFlowImport | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
 
-  // Shape 1 — a real Export. Every type stores the same doc shape now.
+  // Shape 1 — a real Export.
   if (r.type === EXPORT_TYPE) {
     if (typeof r.flow !== "object" || r.flow === null) return null;
     const f = r.flow as Record<string, unknown>;
-    if (typeof f.type !== "string" || !VALID_TYPES.includes(f.type as DiagramType)) return null;
     if (typeof f.name !== "string") return null;
+    if (f.type === "schema") {
+      if (!isLikelySchemaDoc(f.content)) return null;
+      return { type: "schema", name: f.name, content: f.content as unknown as SchemaDoc };
+    }
+    if (typeof f.type !== "string" || !VALID_OUTLINE_TYPES.includes(f.type as DiagramType)) return null;
     if (!isLikelySmartFlowDoc(f.content)) return null;
     return { type: f.type as DiagramType, name: f.name, content: f.content as unknown as SmartFlowDoc };
   }
