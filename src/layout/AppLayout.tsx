@@ -11,6 +11,7 @@ import StandaloneNotice from "@/components/StandaloneNotice";
 import { ChooserModal } from "@/components/smartflow/ChooserModal";
 import { useCreateFlow } from "@/lib/useCreateFlow";
 import { FlowsProvider } from "./FlowsContext";
+import { DiscoveryProvider } from "./DiscoveryContext";
 import { FlowSidebar } from "./FlowSidebar";
 
 const { Sider, Content, Footer } = Layout;
@@ -24,7 +25,9 @@ const SIDEBAR_COLLAPSED_KEY = "smart-flow-sidebar-collapsed";
 export default function AppLayout() {
   return (
     <FlowsProvider>
-      <AppLayoutInner />
+      <DiscoveryProvider>
+        <AppLayoutInner />
+      </DiscoveryProvider>
     </FlowsProvider>
   );
 }

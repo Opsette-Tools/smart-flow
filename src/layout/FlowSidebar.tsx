@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button, Menu, Tooltip, message, type MenuProps } from "antd";
-import { ImportOutlined, HomeOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import { ImportOutlined, HomeOutlined, FolderOpenOutlined, AudioOutlined } from "@ant-design/icons";
 import { flowsRepo } from "@/db/flowsRepo";
 import { parseFlowImport } from "@/lib/flowExport";
 import { setActiveFlowId } from "@/lib/activeFlow";
@@ -9,6 +9,7 @@ import { useFlows } from "./FlowsContext";
 
 const HOME_KEY = "__home__";
 const LIBRARY_KEY = "__library__";
+const DISCOVERY_KEY = "__discovery__";
 
 interface Props {
   /** True only in the desktop Sider's collapsed (icon-rail) state. The Menu
@@ -62,14 +63,22 @@ export function FlowSidebar({ collapsed, onNavigate }: Props) {
     () => [
       { key: HOME_KEY, icon: <HomeOutlined />, label: "Home" },
       { key: LIBRARY_KEY, icon: <FolderOpenOutlined />, label: "Library" },
+      { key: DISCOVERY_KEY, icon: <AudioOutlined />, label: "Discovery" },
     ],
     [],
   );
 
-  const selectedKeys = location.pathname === "/" ? [HOME_KEY] : location.pathname === "/library" ? [LIBRARY_KEY] : [];
+  const selectedKeys =
+    location.pathname === "/"
+      ? [HOME_KEY]
+      : location.pathname === "/library"
+        ? [LIBRARY_KEY]
+        : location.pathname.startsWith("/discovery")
+          ? [DISCOVERY_KEY]
+          : [];
 
   const handleClick: MenuProps["onClick"] = ({ key }) => {
-    navigate(key === HOME_KEY ? "/" : "/library");
+    navigate(key === HOME_KEY ? "/" : key === DISCOVERY_KEY ? "/discovery" : "/library");
     onNavigate();
   };
 
