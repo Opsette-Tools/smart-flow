@@ -53,6 +53,16 @@ export function SessionHeaderForm({ header, dispatch }: Props) {
       </section>
 
       <section className="sf-field-group">
+        <h4 className="sf-field-title">Scope</h4>
+        <Input
+          key={`scope-${header.scope ?? ""}`}
+          placeholder="e.g. Described by an outgoing owner; a new owner is taking over the role"
+          defaultValue={header.scope ?? ""}
+          onBlur={(e) => set({ scope: e.target.value || undefined })}
+        />
+      </section>
+
+      <section className="sf-field-group">
         <h4 className="sf-field-title">Recording start time</h4>
         <TimePicker
           value={header.recordingStart ? dayjs(header.recordingStart, TIME_FORMAT) : null}

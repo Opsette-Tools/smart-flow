@@ -18,6 +18,7 @@ const SIDE_SECTIONS: { key: keyof SideSectionSelection; label: string }[] = [
   { key: "glossary", label: "Glossary" },
   { key: "exceptions", label: "Exceptions" },
   { key: "volume", label: "Volume" },
+  { key: "openQuestions", label: "Open questions" },
 ];
 
 /**
@@ -57,6 +58,7 @@ export function DiscoveryExportModal({ open, onClose, doc, sessionName }: Props)
     glossary: true,
     exceptions: true,
     volume: true,
+    openQuestions: true,
   });
 
   const orderedSteps = useMemo(() => [...doc.steps].sort((a, b) => a.order - b.order), [doc.steps]);

@@ -22,6 +22,13 @@ export interface SessionHeader {
   processName: string;
   /** Free text (e.g. "2:05 PM") — not parsed, just recorded. */
   recordingStart: string;
+  /** One-line caveat on who described the process and whether that's
+   *  changing — e.g. "Described by an outgoing owner; a new owner is taking
+   *  over the role." Optional: most sessions don't need it, but when someone
+   *  in the room says their own account of the process is about to stop
+   *  being the account, that's a fact about the whole document, not a step
+   *  or a side-table row, and it belongs where a reader sees it first. */
+  scope?: string;
 }
 
 export function emptySessionHeader(): SessionHeader {
@@ -122,6 +129,17 @@ export interface VolumeRow {
   peakPeriods: string;
 }
 
+/** Something the transcript doesn't resolve — a decision owner nobody named,
+ *  two artifacts that might be the same document, a gap nobody assigned. This
+ *  is deliberately a single free-text field, not a structured claim/resolution
+ *  pair: at this stage the point is to record that the gap exists so it turns
+ *  into a real question for the client, not to force a premature structure
+ *  onto something nobody has answered yet. */
+export interface OpenQuestion {
+  id: string;
+  question: string;
+}
+
 /** A session-scoped controlled-list option — same shape MECHANISMS uses in
  *  smartflow/types.ts, but the list itself lives on the doc (see roles.ts). */
 export interface ListOption {
@@ -139,6 +157,7 @@ export interface DiscoveryDoc {
   glossary: GlossaryTerm[];
   exceptions: ExceptionCase[];
   volume: VolumeRow[];
+  openQuestions: OpenQuestion[];
 }
 
 export function emptyDiscoveryDoc(): DiscoveryDoc {
@@ -152,5 +171,6 @@ export function emptyDiscoveryDoc(): DiscoveryDoc {
     glossary: [],
     exceptions: [],
     volume: [],
+    openQuestions: [],
   };
 }

@@ -18,6 +18,7 @@ import {
   type ExceptionCase,
   type GlossaryTerm,
   type ListOption,
+  type OpenQuestion,
   type SessionHeader,
   type StepBranch,
   type VolumeRow,
@@ -76,6 +77,9 @@ export type Action =
   | { type: "ADD_VOLUME_ROW" }
   | { type: "SET_VOLUME_ROW"; id: string; patch: Partial<Omit<VolumeRow, "id">> }
   | { type: "DELETE_VOLUME_ROW"; id: string }
+  | { type: "ADD_OPEN_QUESTION" }
+  | { type: "SET_OPEN_QUESTION"; id: string; patch: Partial<Omit<OpenQuestion, "id">> }
+  | { type: "DELETE_OPEN_QUESTION"; id: string }
   | { type: "RESET" }
   | { type: "REPLACE_DOC"; doc: DiscoveryDoc };
 
@@ -290,6 +294,20 @@ export function reducer(doc: DiscoveryDoc, action: Action): DiscoveryDoc {
 
     case "DELETE_VOLUME_ROW":
       return { ...doc, volume: doc.volume.filter((v) => v.id !== action.id) };
+
+    case "ADD_OPEN_QUESTION": {
+      const row: OpenQuestion = { id: uuid(), question: "" };
+      return { ...doc, openQuestions: [...doc.openQuestions, row] };
+    }
+
+    case "SET_OPEN_QUESTION":
+      return {
+        ...doc,
+        openQuestions: doc.openQuestions.map((q) => (q.id === action.id ? { ...q, ...action.patch } : q)),
+      };
+
+    case "DELETE_OPEN_QUESTION":
+      return { ...doc, openQuestions: doc.openQuestions.filter((q) => q.id !== action.id) };
 
     case "RESET":
       return emptyDiscoveryDoc();

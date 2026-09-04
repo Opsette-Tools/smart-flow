@@ -2,7 +2,7 @@ import { type Dispatch } from "react";
 import type { Action } from "../store";
 import type { DiscoveryDoc } from "../types";
 import { SideTable, type SideTableField } from "./SideTable";
-import type { Artifact, DecisionRule, ExceptionCase, GlossaryTerm, VolumeRow } from "../types";
+import type { Artifact, DecisionRule, ExceptionCase, GlossaryTerm, OpenQuestion, VolumeRow } from "../types";
 
 interface Props {
   doc: DiscoveryDoc;
@@ -43,6 +43,8 @@ const VOLUME_FIELDS: SideTableField<VolumeRow>[] = [
   { key: "countPerPeriod", label: "Count per period", width: 160 },
   { key: "peakPeriods", label: "Peak periods", width: 160 },
 ];
+
+const OPEN_QUESTION_FIELDS: SideTableField<OpenQuestion>[] = [{ key: "question", label: "Question" }];
 
 /** The five side captures that hang off a discovery session, each rendered
  *  through the shared SideTable renderer. */
@@ -102,6 +104,17 @@ export function SideTablesPanel({ doc, dispatch }: Props) {
         onAdd={() => dispatch({ type: "ADD_VOLUME_ROW" })}
         onChange={(id, patch) => dispatch({ type: "SET_VOLUME_ROW", id, patch })}
         onDelete={(id) => dispatch({ type: "DELETE_VOLUME_ROW", id })}
+      />
+
+      <SideTable
+        title="Open questions"
+        emptyLabel="No open questions logged yet"
+        addLabel="Question"
+        rows={doc.openQuestions}
+        fields={OPEN_QUESTION_FIELDS}
+        onAdd={() => dispatch({ type: "ADD_OPEN_QUESTION" })}
+        onChange={(id, patch) => dispatch({ type: "SET_OPEN_QUESTION", id, patch })}
+        onDelete={(id) => dispatch({ type: "DELETE_OPEN_QUESTION", id })}
       />
     </div>
   );

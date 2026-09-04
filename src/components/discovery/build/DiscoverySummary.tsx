@@ -1,6 +1,6 @@
 import { Typography } from "antd";
 import dayjs from "dayjs";
-import type { Artifact, CaptureStep, DecisionRule, DiscoveryDoc, ExceptionCase, GlossaryTerm, VolumeRow } from "../types";
+import type { Artifact, CaptureStep, DecisionRule, DiscoveryDoc, ExceptionCase, GlossaryTerm, OpenQuestion, VolumeRow } from "../types";
 import { listLabel } from "../lists";
 
 // SessionHeader.date is stored as "YYYY-MM-DD" (see SessionHeaderForm's
@@ -22,6 +22,7 @@ export interface SideSectionSelection {
   glossary: boolean;
   exceptions: boolean;
   volume: boolean;
+  openQuestions: boolean;
 }
 
 /** What DiscoverySummary should include. Undefined (the default) means
@@ -41,7 +42,14 @@ export function allSelected(): DiscoverySelection {
   return {
     header: true,
     steps: true,
-    sideSections: { artifacts: true, decisionRules: true, glossary: true, exceptions: true, volume: true },
+    sideSections: {
+      artifacts: true,
+      decisionRules: true,
+      glossary: true,
+      exceptions: true,
+      volume: true,
+      openQuestions: true,
+    },
   };
 }
 
@@ -69,13 +77,14 @@ export function DiscoverySummary({ doc, selection }: Props) {
     .filter((s) => !sel.stepIds || sel.stepIds.has(s.id));
   const hasHeader =
     sel.header &&
-    !!(doc.header.division || doc.header.processName || doc.header.date || doc.header.attendees || doc.header.recordingStart);
+    !!(doc.header.division || doc.header.processName || doc.header.date || doc.header.attendees || doc.header.recordingStart || doc.header.scope);
 
   return (
     <div className="sf-discovery-summary">
       {hasHeader && (
         <section className="sf-summary-section sf-summary-section-header">
           <h1 className="sf-summary-heading">{doc.header.processName || "Discovery session"}</h1>
+          {doc.header.scope && <p className="sf-summary-scope">{doc.header.scope}</p>}
           <div className="sf-summary-header-facts">
             {doc.header.division && <Fact label="Division" value={doc.header.division} />}
             {doc.header.date && <Fact label="Date" value={formatHeaderDate(doc.header.date)} />}
@@ -121,6 +130,14 @@ export function DiscoverySummary({ doc, selection }: Props) {
       )}
       {sel.sideSections.volume && (
         <SideSection title="Volume" rows={doc.volume} render={renderVolume} empty="No volume data logged." />
+      )}
+      {sel.sideSections.openQuestions && (
+        <SideSection
+          title="Open questions"
+          rows={doc.openQuestions}
+          render={renderOpenQuestion}
+          empty="No open questions logged."
+        />
       )}
     </div>
   );
@@ -284,4 +301,8 @@ function renderVolume(row: VolumeRow) {
       { label: "Peak periods", value: row.peakPeriods },
     ],
   };
+}
+
+function renderOpenQuestion(row: OpenQuestion) {
+  return { primary: row.question, fields: [] };
 }

@@ -2182,6 +2182,19 @@ html.dark .sf-summary-fact-label {
 .sf-summary-header-facts {
   margin-top: 4px;
 }
+/* Scope note — a caveat on the whole document (who described the process,
+   whether that's changing), not another fact/value pair. Sits right under
+   the title's rule, styled apart from the fact rows so it reads as framing
+   rather than one more data point. */
+.sf-summary-scope {
+  font-size: var(--ops-fs-fine);
+  font-style: italic;
+  color: #666;
+  margin: 0 0 12px;
+}
+html.dark .sf-summary-scope {
+  color: #aaa;
+}
 .sf-summary-attendees {
   white-space: pre-wrap;
 }

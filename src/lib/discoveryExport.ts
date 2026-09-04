@@ -42,7 +42,12 @@ export interface ParsedDiscoveryImport {
 }
 
 /** True for a plain DiscoveryDoc shape — checked by the fields only this doc
- *  ever carries, same spirit as flowExport.ts's isLikelySmartFlowDoc. */
+ *  ever carries, same spirit as flowExport.ts's isLikelySmartFlowDoc.
+ *  `openQuestions` is NOT required here: it's a field added after the first
+ *  exports shipped, and an older export omitting it is still a valid
+ *  DiscoveryDoc — see the normalization in parseDiscoveryImport below, same
+ *  "old docs read as new untouched" principle as PersistedDoc in
+ *  smartflow/types.ts. */
 function isLikelyDiscoveryDoc(v: unknown): v is Record<string, unknown> {
   if (typeof v !== "object" || v === null) return false;
   const d = v as Record<string, unknown>;
@@ -80,5 +85,8 @@ export function parseDiscoveryImport(text: string): ParsedDiscoveryImport | null
   const s = r.session as Record<string, unknown>;
   if (typeof s.name !== "string") return null;
   if (!isLikelyDiscoveryDoc(s.content)) return null;
-  return { name: s.name, content: s.content as unknown as DiscoveryDoc };
+  const content = s.content as unknown as DiscoveryDoc;
+  // Backfill for an export made before openQuestions existed.
+  if (!Array.isArray(content.openQuestions)) content.openQuestions = [];
+  return { name: s.name, content };
 }
