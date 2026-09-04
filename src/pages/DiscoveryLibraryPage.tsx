@@ -2,15 +2,14 @@ import { useRef, useState } from "react";
 import { Button, Dropdown, Empty, Input, List, Modal, Typography, message } from "antd";
 import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ImportOutlined, MoreOutlined, PlusOutlined } from "@ant-design/icons";
 import { discoverySessionsRepo } from "@/db/discoverySessionsRepo";
+import { flowsRepo } from "@/db/flowsRepo";
 import type { DiscoverySession } from "@/db/discoveryTypes";
 import { useCreateDiscoverySession } from "@/lib/useCreateDiscoverySession";
 import { useDiscoverySessions } from "@/layout/DiscoveryContext";
-import {
-  discoveryExportFileName,
-  parseDiscoveryImport,
-  serializeDiscoveryExport,
-} from "@/lib/discoveryExport";
+import { useFlows } from "@/layout/FlowsContext";
+import { discoveryExportFileName, serializeDiscoveryExport } from "@/lib/discoveryExport";
 import { triggerDownload } from "@/lib/flowExport";
+import { sniffImport } from "@/lib/sniffImport";
 
 const { Text } = Typography;
 
@@ -30,6 +29,7 @@ function formatUpdated(ts: number): string {
 /** Every saved discovery session. Mirrors LibraryPage.tsx's shape exactly. */
 export default function DiscoveryLibraryPage() {
   const { sessions, refresh } = useDiscoverySessions();
+  const { refresh: refreshFlows } = useFlows();
   const [renaming, setRenaming] = useState<DiscoverySession | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const { openSession, createSession } = useCreateDiscoverySession();
@@ -48,12 +48,21 @@ export default function DiscoveryLibraryPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const parsed = parseDiscoveryImport(reader.result as string);
-      if (!parsed) {
-        message.error("That isn't a discovery session export file.");
+      const sniffed = sniffImport(reader.result as string);
+
+      if (sniffed.kind === "flow") {
+        const flow = await flowsRepo.create(sniffed.data);
+        refreshFlows();
+        message.success(`"${flow.name}" is a flow — imported into the Library instead`);
         return;
       }
-      const session = await discoverySessionsRepo.create(parsed);
+
+      if (sniffed.kind === "unrecognized") {
+        message.error("That isn't a SmartFlow export file.");
+        return;
+      }
+
+      const session = await discoverySessionsRepo.create(sniffed.data);
       refresh();
       message.success(`Imported "${session.name}"`);
     };

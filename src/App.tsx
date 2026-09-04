@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ThemeProvider } from "@/lib/theme";
 import AppLayout from "@/layout/AppLayout";
-import StartPage from "@/pages/StartPage";
+import HomePage from "@/pages/HomePage";
 import LibraryPage from "@/pages/LibraryPage";
 import FlowPage from "@/pages/FlowPage";
 import DiscoveryLibraryPage from "@/pages/DiscoveryLibraryPage";
@@ -16,7 +16,7 @@ export function App() {
       <BrowserRouter basename={basename}>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<StartPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/flow/:id" element={<FlowPage />} />
             <Route path="/discovery" element={<DiscoveryLibraryPage />} />

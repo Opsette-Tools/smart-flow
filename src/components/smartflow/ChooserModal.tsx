@@ -87,11 +87,9 @@ function TypeChooser({ onPick }: { onPick: (type: DiagramType) => void }) {
                 <span style={{ flex: 1 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Text strong>{d.chooserAnswer}</Text>
-                    {isSel && (
-                      <Tag color="green" style={{ marginInlineEnd: 0 }}>
-                        <CheckCircleFilled /> {d.name}
-                      </Tag>
-                    )}
+                    <Tag color={isSel ? "green" : "default"} style={{ marginInlineEnd: 0 }}>
+                      {isSel && <CheckCircleFilled />} {d.name}
+                    </Tag>
                   </span>
                   <Text type="secondary" style={{ fontSize: 13 }}>
                     {d.inputHint}

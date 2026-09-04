@@ -1,11 +1,14 @@
 import { useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button, Menu, Tooltip, message, type MenuProps } from "antd";
-import { ImportOutlined, HomeOutlined, FolderOpenOutlined, AudioOutlined } from "@ant-design/icons";
+import { ImportOutlined, HomeOutlined, FolderOpenOutlined, SearchOutlined } from "@ant-design/icons";
 import { flowsRepo } from "@/db/flowsRepo";
-import { parseFlowImport } from "@/lib/flowExport";
+import { discoverySessionsRepo } from "@/db/discoverySessionsRepo";
+import { sniffImport } from "@/lib/sniffImport";
 import { setActiveFlowId } from "@/lib/activeFlow";
+import { setActiveDiscoverySessionId } from "@/lib/activeDiscoverySession";
 import { useFlows } from "./FlowsContext";
+import { useDiscoverySessions } from "./DiscoveryContext";
 
 const HOME_KEY = "__home__";
 const LIBRARY_KEY = "__library__";
@@ -32,6 +35,7 @@ interface Props {
  */
 export function FlowSidebar({ collapsed, onNavigate }: Props) {
   const { refresh } = useFlows();
+  const { refresh: refreshDiscovery } = useDiscoverySessions();
   const location = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,12 +48,24 @@ export function FlowSidebar({ collapsed, onNavigate }: Props) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const parsed = parseFlowImport(reader.result as string);
-      if (!parsed) {
+      const sniffed = sniffImport(reader.result as string);
+
+      if (sniffed.kind === "discovery") {
+        const session = await discoverySessionsRepo.create(sniffed.data);
+        refreshDiscovery();
+        setActiveDiscoverySessionId(session.id);
+        navigate(`/discovery/${session.id}`);
+        onNavigate();
+        message.success(`Imported "${session.name}" into Discovery`);
+        return;
+      }
+
+      if (sniffed.kind === "unrecognized") {
         message.error("That isn't a SmartFlow export file.");
         return;
       }
-      const flow = await flowsRepo.create(parsed);
+
+      const flow = await flowsRepo.create(sniffed.data);
       refresh();
       setActiveFlowId(flow.id);
       navigate(`/flow/${flow.id}`);
@@ -63,7 +79,7 @@ export function FlowSidebar({ collapsed, onNavigate }: Props) {
     () => [
       { key: HOME_KEY, icon: <HomeOutlined />, label: "Home" },
       { key: LIBRARY_KEY, icon: <FolderOpenOutlined />, label: "Library" },
-      { key: DISCOVERY_KEY, icon: <AudioOutlined />, label: "Discovery" },
+      { key: DISCOVERY_KEY, icon: <SearchOutlined />, label: "Discovery" },
     ],
     [],
   );
