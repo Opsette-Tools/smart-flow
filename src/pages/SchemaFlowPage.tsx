@@ -7,6 +7,7 @@ import {
   CopyOutlined,
   DeleteOutlined,
   ExportOutlined,
+  ShareAltOutlined,
 } from "@ant-design/icons";
 import { schemaReducer, emptySchemaDoc } from "@/components/smartflow/schema/store";
 import { SchemaCanvas } from "@/components/smartflow/schema/canvas/SchemaCanvas";
@@ -17,6 +18,7 @@ import { setActiveFlowId } from "@/lib/activeFlow";
 import { isBridgeMode } from "@/lib/bridgeInstance";
 import { useFlows } from "@/layout/FlowsContext";
 import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
+import { RecordShareModal } from "@/components/opsette-share";
 
 const { Text } = Typography;
 
@@ -43,6 +45,7 @@ export function SchemaFlowPage({ id, flow: initial }: { id: string; flow: Flow }
   const [doc, dispatch] = useReducer(schemaReducer, (initial.content as SchemaDoc) ?? emptySchemaDoc);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [sharing, setSharing] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
   const latestRef = useRef({ flow, doc });
   latestRef.current = { flow, doc };
@@ -125,6 +128,19 @@ export function SchemaFlowPage({ id, flow: initial }: { id: string; flow: Flow }
           <Text type="secondary" className="sf-topbar-which">
             {flow.name}
           </Text>
+          {/* Share is a first-class action, not a kebab item — see FlowPage.tsx
+              for the same placement on every other diagram type's page. */}
+          {isBridgeMode() && (
+            <Button
+              type="text"
+              size="small"
+              icon={<ShareAltOutlined />}
+              onClick={() => setSharing(true)}
+              aria-label={`Share ${flow.name}`}
+            >
+              Share
+            </Button>
+          )}
           <Dropdown
             trigger={["click"]}
             menu={{
@@ -152,6 +168,8 @@ export function SchemaFlowPage({ id, flow: initial }: { id: string; flow: Flow }
       <Modal open={renaming} title="Rename flow" onCancel={() => setRenaming(false)} onOk={submitRename} okText="Save">
         <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onPressEnter={submitRename} autoFocus maxLength={80} />
       </Modal>
+
+      <RecordShareModal open={sharing} onClose={() => setSharing(false)} dataId={flow.id} recordName={flow.name} />
     </>
   );
 }

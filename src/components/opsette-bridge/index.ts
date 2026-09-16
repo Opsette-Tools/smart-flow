@@ -7,4 +7,6 @@ export type {
   EmitDataPayload,
   EmitFilePayload,
   EmitResult,
+  ShareLinkResult,
+  ShareLinkRevokeResult,
 } from "./bridge";

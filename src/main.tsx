@@ -1,6 +1,9 @@
 import { createRoot } from "react-dom/client";
 import { message } from "antd";
 import { App } from "./App";
+import { ThemeProvider } from "./lib/theme";
+import { PublicSharePage } from "./pages/PublicSharePage";
+import { getShareTokenFromUrl } from "./lib/publicShare";
 import { connectBridge } from "./components/opsette-bridge";
 import { hydrateFromBridge } from "./db/flowsRepo";
 import { hydrateFromDiscoveryBridge } from "./db/discoverySessionsRepo";
@@ -13,100 +16,130 @@ import "./styles/tokens.css";
 import "./components/smartflow/smartflow.css";
 import "./index.css";
 
-// GitHub Pages SPA fallback (rafgraph pattern, paired with public/404.html):
-// the 404 page encodes the real path into the query string and bounces here;
-// decode it back into a real path BEFORE the router mounts, so a deep link
-// or a refresh on /library or /flow/:id lands on the right route instead of
-// silently dropping back to "/".
-(function decodeSpaRedirect(l: Location) {
-  if (l.search[1] === "/") {
-    const decoded = l.search
-      .slice(1)
-      .split("&")
-      .map((s) => s.replace(/~and~/g, "&"))
-      .join("?");
-    window.history.replaceState(null, "", l.pathname.slice(0, -1) + decoded + l.hash);
+/**
+ * Everything that makes this tool an authenticated, stateful app: the SPA
+ * redirect decode, PWA service worker, the Opsette bridge handshake +
+ * hydrate, legacy migration, and finally <App/> (router + IndexedDB-backed
+ * chrome). Skipped entirely for a public share-link visitor — see the
+ * `shareToken` branch at the bottom of this file.
+ */
+function bootNormally() {
+  // GitHub Pages SPA fallback (rafgraph pattern, paired with public/404.html):
+  // the 404 page encodes the real path into the query string and bounces here;
+  // decode it back into a real path BEFORE the router mounts, so a deep link
+  // or a refresh on /library or /flow/:id lands on the right route instead of
+  // silently dropping back to "/".
+  (function decodeSpaRedirect(l: Location) {
+    if (l.search[1] === "/") {
+      const decoded = l.search
+        .slice(1)
+        .split("&")
+        .map((s) => s.replace(/~and~/g, "&"))
+        .join("?");
+      window.history.replaceState(null, "", l.pathname.slice(0, -1) + decoded + l.hash);
+    }
+  })(window.location);
+
+  // PWA service worker registration with iframe / preview guard.
+  // In a preview iframe, service workers cause stale-content issues, so we
+  // unregister any existing SWs there. In production they activate normally.
+  const isInIframe = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+
+  const isPreviewHost =
+    window.location.hostname.includes("id-preview--") ||
+    window.location.hostname.includes("lovableproject.com") ||
+    window.location.hostname.includes("lovable.app");
+
+  if (isPreviewHost || isInIframe) {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+    }
+  } else if ("serviceWorker" in navigator && import.meta.env.PROD) {
+    // Dynamic import so the vite-plugin-pwa virtual module never loads in preview.
+    import("virtual:pwa-register")
+      .then(({ registerSW }) => {
+        registerSW({ immediate: true });
+      })
+      .catch(() => {
+        /* noop */
+      });
   }
-})(window.location);
 
-// PWA service worker registration with iframe / preview guard.
-// In a preview iframe, service workers cause stale-content issues, so we
-// unregister any existing SWs there. In production they activate normally.
-const isInIframe = (() => {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
-})();
+  // Bridge handshake gate. In standalone (window.parent === window) this
+  // resolves to null in <1ms; inside an iframe it awaits the parent's `init`
+  // for up to 1s — render is never blocked past that. When bridge-mode boots,
+  // hydrate IDB from init.items BEFORE rendering so flowsRepo/
+  // discoverySessionsRepo return the right data on first render. Local-only
+  // rows are left untouched either way (see hydrateFromBridge /
+  // SMARTFLOW_STORAGE_PLAN.md §8.2). Both hydrates read the same shared
+  // init.items array and split it by `kind` (see BridgedValue in db/types.ts);
+  // resetParentKnown is called ONCE with the combined ids afterward, since it
+  // clears the set before refilling it and would otherwise have each hydrate
+  // clobber the other's ids.
+  connectBridge<BridgedValue>().then(async (bridge) => {
+    setBridgeInstance(bridge);
+    if (bridge) {
+      // Debounced toast: multiple timeouts in a 1s window collapse to a single
+      // message, so a bulk-save failure doesn't spam.
+      let lastToastAt = 0;
+      bridge.onTimeout(() => {
+        const nowMs = Date.now();
+        if (nowMs - lastToastAt < 1000) return;
+        lastToastAt = nowMs;
+        message.error("Couldn't save — try again");
+      });
+      try {
+        const [flowIds, discoveryIds] = await Promise.all([
+          hydrateFromBridge(bridge.init.items),
+          hydrateFromDiscoveryBridge(bridge.init.items),
+        ]);
+        resetParentKnown([...flowIds, ...discoveryIds]);
+      } catch (err) {
+        console.error("[smart-flow] bridge hydrate failed:", err);
+      }
+    }
 
-const isPreviewHost =
-  window.location.hostname.includes("id-preview--") ||
-  window.location.hostname.includes("lovableproject.com") ||
-  window.location.hostname.includes("lovable.app");
-
-if (isPreviewHost || isInIframe) {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((r) => r.unregister());
+    // Bring forward any pre-library single-slot doc/text (standalone-only —
+    // this browser's own localStorage, untouched by the bridge either way).
+    // Never let a migration failure (IndexedDB blocked, private browsing,
+    // quota) stop the app from rendering — the legacy key is never deleted by
+    // the migration either way, so the source data survives a failed attempt;
+    // only the render itself must not be allowed to block on it.
+    const activeId = await migrateLegacyIfNeeded().catch((err) => {
+      console.error("[smart-flow] migration failed, continuing without it:", err);
+      return null;
     });
-  }
-} else if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  // Dynamic import so the vite-plugin-pwa virtual module never loads in preview.
-  import("virtual:pwa-register")
-    .then(({ registerSW }) => {
-      registerSW({ immediate: true });
-    })
-    .catch(() => {
-      /* noop */
-    });
+    if (activeId) setActiveFlowId(activeId);
+
+    createRoot(document.getElementById("root")!).render(<App />);
+  });
 }
 
-// Bridge handshake gate. In standalone (window.parent === window) this
-// resolves to null in <1ms; inside an iframe it awaits the parent's `init`
-// for up to 1s — render is never blocked past that. When bridge-mode boots,
-// hydrate IDB from init.items BEFORE rendering so flowsRepo/
-// discoverySessionsRepo return the right data on first render. Local-only
-// rows are left untouched either way (see hydrateFromBridge /
-// SMARTFLOW_STORAGE_PLAN.md §8.2). Both hydrates read the same shared
-// init.items array and split it by `kind` (see BridgedValue in db/types.ts);
-// resetParentKnown is called ONCE with the combined ids afterward, since it
-// clears the set before refilling it and would otherwise have each hydrate
-// clobber the other's ids.
-connectBridge<BridgedValue>().then(async (bridge) => {
-  setBridgeInstance(bridge);
-  if (bridge) {
-    // Debounced toast: multiple timeouts in a 1s window collapse to a single
-    // message, so a bulk-save failure doesn't spam.
-    let lastToastAt = 0;
-    bridge.onTimeout(() => {
-      const nowMs = Date.now();
-      if (nowMs - lastToastAt < 1000) return;
-      lastToastAt = nowMs;
-      message.error("Couldn't save — try again");
-    });
-    try {
-      const [flowIds, discoveryIds] = await Promise.all([
-        hydrateFromBridge(bridge.init.items),
-        hydrateFromDiscoveryBridge(bridge.init.items),
-      ]);
-      resetParentKnown([...flowIds, ...discoveryIds]);
-    } catch (err) {
-      console.error("[smart-flow] bridge hydrate failed:", err);
-    }
-  }
-
-  // Bring forward any pre-library single-slot doc/text (standalone-only —
-  // this browser's own localStorage, untouched by the bridge either way).
-  // Never let a migration failure (IndexedDB blocked, private browsing,
-  // quota) stop the app from rendering — the legacy key is never deleted by
-  // the migration either way, so the source data survives a failed attempt;
-  // only the render itself must not be allowed to block on it.
-  const activeId = await migrateLegacyIfNeeded().catch((err) => {
-    console.error("[smart-flow] migration failed, continuing without it:", err);
-    return null;
-  });
-  if (activeId) setActiveFlowId(activeId);
-
-  createRoot(document.getElementById("root")!).render(<App />);
-});
+// Public share-link boot path. A `?share_token=` in the URL means this load
+// is `app/share/[token]/page.tsx` on Opsette's side loading this tool inside
+// an iframe for an anonymous visitor — see
+// C:\opsette\opsette-v2\docs\MARKETPLACE_PUBLIC_SHARE_LINKS_PLAN.md. This
+// bypasses EVERYTHING bootNormally() does: no connectBridge handshake (no
+// session to authenticate it with — the doc is explicit that this mode has
+// no ready/init at all), no IndexedDB, no PWA registration, no SPA-redirect
+// decoding, no <App/> router/chrome. A visitor's own in-progress local work
+// (if this same browser also uses SmartFlow standalone) must never be read
+// or touched by this path.
+const shareToken = getShareTokenFromUrl();
+if (shareToken) {
+  createRoot(document.getElementById("root")!).render(
+    <ThemeProvider>
+      <PublicSharePage token={shareToken} />
+    </ThemeProvider>,
+  );
+} else {
+  bootNormally();
+}

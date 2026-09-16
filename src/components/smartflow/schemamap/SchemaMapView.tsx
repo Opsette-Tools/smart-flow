@@ -47,6 +47,11 @@ const DRAG_THRESHOLD = 3;
 interface Props {
   doc: SmartFlowDoc;
   dispatch: Dispatch<Action>;
+  /** Public share-link viewer: drag/pan/zoom/focus/export all stay live —
+   *  same reasoning as SchemaCanvas's readOnly (drag is local-only, reaches
+   *  nobody, since the public page passes a no-op dispatch). Only the
+   *  genuinely destructive, persisted "Reset layout" action is hidden. */
+  readOnly?: boolean;
 }
 
 interface DragState {
@@ -61,7 +66,7 @@ interface DragState {
   moved: boolean;
 }
 
-export function SchemaMapView({ doc, dispatch }: Props) {
+export function SchemaMapView({ doc, dispatch, readOnly = false }: Props) {
   const { mode } = useThemeMode();
   const isDark = mode === "dark";
   const isNarrow = useIsNarrow();
@@ -253,14 +258,20 @@ export function SchemaMapView({ doc, dispatch }: Props) {
       if (d.kind === "card" && d.laneId) {
         if (d.moved) {
           // Commit the drag to the doc, then drop the local offset so there's
-          // one source of truth again.
+          // one source of truth again. Read-only (public view) has a no-op
+          // dispatch, so doc.lanePositions never actually updates — clearing
+          // dragPos there would snap the card straight back (same bug fixed
+          // in SchemaCanvas). Leave it in local state so it sticks for the
+          // rest of this page view.
           const landed = dragPos[d.laneId];
           if (landed) {
             dispatch({ type: "SET_LANE_POSITION", laneId: d.laneId, x: landed.x, y: landed.y });
-            setDragPos((prev) => {
-              const { [d.laneId!]: _done, ...rest } = prev;
-              return rest;
-            });
+            if (!readOnly) {
+              setDragPos((prev) => {
+                const { [d.laneId!]: _done, ...rest } = prev;
+                return rest;
+              });
+            }
           }
         } else {
           setFocused((prev) => (prev === d.laneId ? null : d.laneId!));
@@ -269,7 +280,7 @@ export function SchemaMapView({ doc, dispatch }: Props) {
         setFocused(null);
       }
     },
-    [dispatch, dragPos],
+    [dispatch, dragPos, readOnly],
   );
 
   // ── Export ───────────────────────────────────────────────────────
@@ -339,13 +350,15 @@ export function SchemaMapView({ doc, dispatch }: Props) {
           <Tooltip title="Fit on screen">
             <Button icon={<AimOutlined />} onClick={fitView} disabled={!hasContent} />
           </Tooltip>
-          <Tooltip title="Reset layout">
-            <Button
-              icon={<UndoOutlined />}
-              onClick={handleReset}
-              disabled={!hasContent || !hasCustomLayout}
-            />
-          </Tooltip>
+          {!readOnly && (
+            <Tooltip title="Reset layout">
+              <Button
+                icon={<UndoOutlined />}
+                onClick={handleReset}
+                disabled={!hasContent || !hasCustomLayout}
+              />
+            </Tooltip>
+          )}
           <Button
             type="primary"
             icon={<DownloadOutlined />}

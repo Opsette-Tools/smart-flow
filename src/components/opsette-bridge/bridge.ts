@@ -84,6 +84,24 @@ export interface EmitResult {
   entity: EmitEntity;
 }
 
+// ── request_share_link channel (bridge v2, public share links) ────────────
+// Mirrors opsette-v2's src/types/iframe-apps.ts BridgeRequestShareLinkRequest
+// / BridgeShareLink exactly. Opsette owns and mints the token; this tool only
+// ever sees the resulting URL. See docs/MARKETPLACE_PUBLIC_SHARE_LINKS_PLAN.md.
+
+/** The full public URL for one record, ready to display/copy. */
+export interface ShareLinkResult {
+  data_id: string;
+  url: string;
+}
+
+/** Result of a successful revoke — the link is off, the token no longer
+ *  resolves. Mirrors BridgeShareLinkRevoked in opsette-v2's
+ *  src/types/iframe-apps.ts. */
+export interface ShareLinkRevokeResult {
+  data_id: string;
+}
+
 // ── Bridge surface ──────────────────────────────────────────────────────────
 
 export interface InitPayload<T> {
@@ -105,6 +123,12 @@ export interface Bridge<T> {
   delete: (data_id: string) => Promise<void>;
   /** Fire a typed payload at the parent; resolves with the inbox row once staged. */
   emit: (entity: EmitEntity, payload: EmitPayload) => Promise<EmitResult>;
+  /** Ask the parent to mint (or return the existing) public share link for one
+   *  record. Resolves with the full `/share/{token}` URL to display/copy. */
+  requestShareLink: (data_id: string) => Promise<ShareLinkResult>;
+  /** Turn a record's public share link off. Idempotent — safe to call on an
+   *  already-unshared record. */
+  revokeShareLink: (data_id: string) => Promise<ShareLinkRevokeResult>;
   /** Register a callback invoked when any in-flight request times out. Returns an unsubscribe. */
   onTimeout: (handler: () => void) => () => void;
 }
@@ -283,6 +307,15 @@ function buildBridge<T>(
       sendRequest<Record<string, unknown>>({ type: 'emit', entity, payload }).then((ack) => ({
         inbox_id: typeof ack.inbox_id === 'string' ? ack.inbox_id : '',
         entity: (typeof ack.entity === 'string' ? ack.entity : entity) as EmitEntity,
+      })),
+    requestShareLink: (data_id) =>
+      sendRequest<Record<string, unknown>>({ type: 'request_share_link', data_id }).then((ack) => ({
+        data_id: typeof ack.data_id === 'string' ? ack.data_id : data_id,
+        url: typeof ack.url === 'string' ? ack.url : '',
+      })),
+    revokeShareLink: (data_id) =>
+      sendRequest<Record<string, unknown>>({ type: 'revoke_share_link', data_id }).then((ack) => ({
+        data_id: typeof ack.data_id === 'string' ? ack.data_id : data_id,
       })),
     onTimeout: (handler) => {
       timeoutHandlers.add(handler);

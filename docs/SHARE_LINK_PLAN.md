@@ -1,6 +1,17 @@
 # SmartFlow sharing: a link that rebuilds the board
 
-**Status:** planned 2026-08-27. Not built.
+**Status: SUPERSEDED 2026-09-16.** Not built, and not going to be — see
+`C:\opsette\opsette-v2\docs\MARKETPLACE_PUBLIC_SHARE_LINKS_PLAN.md` for the
+current plan. That doc chose the opposite architecture on the one question
+this doc treated as settled: a **live**, token-based link backed by Opsette
+(`iframe_app_data.public_token`, a public API route that re-fetches on every
+load) instead of this doc's **snapshot-in-the-URL, no backend** design. The
+two are mutually incompatible transports, not phases of the same feature.
+Kept here for the compression/measurement research in §1, which is still true
+and may be useful if a URL-embedded fallback is ever wanted — but do not build
+against this doc's §4–9.
+
+**Status (original):** planned 2026-08-27. Not built.
 **Author's note:** written as a build brief. Section 9 is the build order.
 
 ---

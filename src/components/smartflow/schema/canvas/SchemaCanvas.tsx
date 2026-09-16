@@ -57,6 +57,17 @@ const DRAG_THRESHOLD = 3;
 interface Props {
   doc: SchemaDoc;
   dispatch: Dispatch<Action>;
+  /** Public share-link viewer: pan/zoom/click-to-inspect AND drag-to-
+   *  reposition all stay live — Ruthnie's call, 2026-09-16: "dragging
+   *  doesn't require any editing," and SET_TABLE_POSITION already goes
+   *  through the same `dispatch` passed in here, so on the public page
+   *  (which passes a no-op) a visitor's drag moves the card in their own
+   *  browser only and reaches nobody — same "local, non-persisted" model as
+   *  the old superseded SHARE_LINK_PLAN.md's map view. Only genuinely
+   *  persisted/schema-editing actions are hidden or disabled: add/rename/
+   *  delete table or column, connector-drag (new relationships), flag/type/
+   *  option editors. See docs/MARKETPLACE_PUBLIC_SHARE_LINKS_PLAN.md §5. */
+  readOnly?: boolean;
 }
 
 interface DragState {
@@ -80,7 +91,7 @@ interface ConnectDraft {
   y: number;
 }
 
-export function SchemaCanvas({ doc, dispatch }: Props) {
+export function SchemaCanvas({ doc, dispatch, readOnly = false }: Props) {
   const { mode } = useThemeMode();
   const isDark = mode === "dark";
 
@@ -179,7 +190,7 @@ export function SchemaCanvas({ doc, dispatch }: Props) {
       const dot = target.closest("[data-connector]") as HTMLElement | null;
       const header = target.closest("[data-card-header]") as HTMLElement | null;
 
-      if (dot) {
+      if (dot && !readOnly) {
         const tableId = dot.getAttribute("data-connector-table")!;
         const columnId = dot.getAttribute("data-connector")!;
         const p = stagePoint(e.clientX, e.clientY);
@@ -226,7 +237,7 @@ export function SchemaCanvas({ doc, dispatch }: Props) {
         frameRef.current?.setPointerCapture(e.pointerId);
       }
     },
-    [cardById, pan, posOf, stagePoint],
+    [cardById, pan, posOf, stagePoint, readOnly],
   );
 
   const onPointerMove = useCallback(
@@ -294,14 +305,21 @@ export function SchemaCanvas({ doc, dispatch }: Props) {
         const landed = dragPos[d.tableId];
         if (landed) {
           dispatch({ type: "SET_TABLE_POSITION", id: d.tableId, x: landed.x, y: landed.y });
-          setDragPos((prev) => {
-            const { [d.tableId!]: _done, ...rest } = prev;
-            return rest;
-          });
+          // Read-only (public view) has a no-op dispatch, so doc.tables'
+          // position never actually updates — posOf's fallback to
+          // doc.tables would snap the card straight back to its saved spot.
+          // Leave the dragged position in dragPos (local React state only,
+          // reaches nobody) so it sticks for the rest of this page view.
+          if (!readOnly) {
+            setDragPos((prev) => {
+              const { [d.tableId!]: _done, ...rest } = prev;
+              return rest;
+            });
+          }
         }
       }
     },
-    [connectDraft, dispatch, dragPos],
+    [connectDraft, dispatch, dragPos, readOnly],
   );
 
   const handleAddTable = () => {
@@ -314,28 +332,37 @@ export function SchemaCanvas({ doc, dispatch }: Props) {
     <section className="sf-schema-page">
       <div className="sf-schema-toolbar">
         <div className="sf-schema-toolbar-left">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddTable}>
-            Add table
-          </Button>
-          <span className="sf-schema-building-for">
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Building for
-            </Text>
-            <Select<BuildTarget | "undecided">
-              size="small"
-              value={doc.buildingFor ?? "undecided"}
-              style={{ width: 110 }}
-              onChange={(v) =>
-                dispatch({ type: "SET_BUILDING_FOR", target: v === "undecided" ? undefined : v })
-              }
-              options={[
-                { value: "undecided", label: "Undecided" },
-                { value: "monday", label: "Monday" },
-                { value: "airtable", label: "Airtable" },
-                { value: "sql", label: "SQL" },
-              ]}
-            />
-          </span>
+          {!readOnly && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAddTable}>
+              Add table
+            </Button>
+          )}
+          {/* Hidden (not just disabled) on the public view: there's nothing
+              for a visitor to control here, and a grayed-out selector reads
+              as clutter, not information — the column-level target labels
+              still render correctly off the saved doc.buildingFor regardless
+              of whether this selector is shown. Ruthnie's call, 2026-09-16. */}
+          {!readOnly && (
+            <span className="sf-schema-building-for">
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Building for
+              </Text>
+              <Select<BuildTarget | "undecided">
+                size="small"
+                value={doc.buildingFor ?? "undecided"}
+                style={{ width: 110 }}
+                onChange={(v) =>
+                  dispatch({ type: "SET_BUILDING_FOR", target: v === "undecided" ? undefined : v })
+                }
+                options={[
+                  { value: "undecided", label: "Undecided" },
+                  { value: "monday", label: "Monday" },
+                  { value: "airtable", label: "Airtable" },
+                  { value: "sql", label: "SQL" },
+                ]}
+              />
+            </span>
+          )}
         </div>
         <div className="sf-schema-toolbar-right">
           <Tooltip title="Zoom out">
@@ -367,7 +394,7 @@ export function SchemaCanvas({ doc, dispatch }: Props) {
             ref={stageRef}
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
           >
-            <CanvasLines cards={cards} edges={edges} posOf={posOf} dispatch={dispatch} />
+            <CanvasLines cards={cards} edges={edges} posOf={posOf} dispatch={dispatch} readOnly={readOnly} />
             {connectDraft && (
               <DraftLine cards={cards} posOf={posOf} draft={connectDraft} isDark={isDark} />
             )}
@@ -385,6 +412,7 @@ export function SchemaCanvas({ doc, dispatch }: Props) {
                   buildingFor={doc.buildingFor}
                   tables={doc.tables}
                   relationships={doc.relationships}
+                  readOnly={readOnly}
                 />
               );
             })}
@@ -442,11 +470,13 @@ function CanvasLines({
   edges,
   posOf,
   dispatch,
+  readOnly,
 }: {
   cards: TableCard[];
   edges: ReturnType<typeof buildCanvasModel>["edges"];
   posOf: (card: TableCard) => { x: number; y: number };
   dispatch: Dispatch<Action>;
+  readOnly: boolean;
 }) {
   const cardById = useMemo(() => new Map(cards.map((c) => [c.tableId, c] as const)), [cards]);
 
@@ -491,17 +521,19 @@ function CanvasLines({
             <path d={d} fill="none" stroke={edge.color} strokeWidth={1.8} opacity={0.85} />
             <RelBadge point={near} label={fromMark} color={edge.color} />
             <RelBadge point={far} label={toMark} color={edge.color} />
-            <foreignObject x={(start.x + end.x) / 2 - 10} y={(start.y + end.y) / 2 - 18} width={20} height={20}>
-              <button
-                type="button"
-                className="sf-schema-rel-delete"
-                onClick={() => dispatch({ type: "DELETE_RELATIONSHIP", id: edge.id })}
-                aria-label="Delete relationship"
-                title="Delete relationship"
-              >
-                <DeleteOutlined style={{ fontSize: 11 }} />
-              </button>
-            </foreignObject>
+            {!readOnly && (
+              <foreignObject x={(start.x + end.x) / 2 - 10} y={(start.y + end.y) / 2 - 18} width={20} height={20}>
+                <button
+                  type="button"
+                  className="sf-schema-rel-delete"
+                  onClick={() => dispatch({ type: "DELETE_RELATIONSHIP", id: edge.id })}
+                  aria-label="Delete relationship"
+                  title="Delete relationship"
+                >
+                  <DeleteOutlined style={{ fontSize: 11 }} />
+                </button>
+              </foreignObject>
+            )}
           </g>
         );
       })}
@@ -532,6 +564,7 @@ function TableCardView({
   buildingFor,
   tables,
   relationships,
+  readOnly,
 }: {
   card: TableCard;
   x: number;
@@ -542,6 +575,7 @@ function TableCardView({
   buildingFor: BuildTarget | undefined;
   tables: SchemaDoc["tables"];
   relationships: SchemaDoc["relationships"];
+  readOnly: boolean;
 }) {
   const [nameDraft, setNameDraft] = useState(card.name);
   const [renamingTable, setRenamingTable] = useState(false);
@@ -557,28 +591,30 @@ function TableCardView({
         className="sf-schema-card-head"
         style={{ height: CARD_HEADER_H, background: card.color }}
       >
-        <Dropdown
-          trigger={["click"]}
-          menu={{
-            items: [{ key: "rename", label: "Rename", icon: <EditOutlined /> }],
-            onClick: ({ key }) => {
-              if (key === "rename") {
-                setNameDraft(card.name);
-                setRenamingTable(true);
-              }
-            },
-          }}
-        >
-          <button
-            type="button"
-            className="sf-schema-card-menu"
-            data-no-drag
-            aria-label={`${card.name} options`}
-            title="Table options"
+        {!readOnly && (
+          <Dropdown
+            trigger={["click"]}
+            menu={{
+              items: [{ key: "rename", label: "Rename", icon: <EditOutlined /> }],
+              onClick: ({ key }) => {
+                if (key === "rename") {
+                  setNameDraft(card.name);
+                  setRenamingTable(true);
+                }
+              },
+            }}
           >
-            <MoreOutlined style={{ fontSize: 13 }} />
-          </button>
-        </Dropdown>
+            <button
+              type="button"
+              className="sf-schema-card-menu"
+              data-no-drag
+              aria-label={`${card.name} options`}
+              title="Table options"
+            >
+              <MoreOutlined style={{ fontSize: 13 }} />
+            </button>
+          </Dropdown>
+        )}
         {renamingTable ? (
           <Input
             size="small"
@@ -605,16 +641,18 @@ function TableCardView({
           // it reads as a rename affordance. The kebab is the only path now.
           <span className="sf-schema-card-name">{card.name}</span>
         )}
-        <button
-          type="button"
-          className="sf-schema-card-delete"
-          data-no-drag
-          onClick={() => dispatch({ type: "DELETE_TABLE", id: card.tableId })}
-          aria-label={`Delete ${card.name}`}
-          title="Delete table"
-        >
-          <DeleteOutlined style={{ fontSize: 12 }} />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="sf-schema-card-delete"
+            data-no-drag
+            onClick={() => dispatch({ type: "DELETE_TABLE", id: card.tableId })}
+            aria-label={`Delete ${card.name}`}
+            title="Delete table"
+          >
+            <DeleteOutlined style={{ fontSize: 12 }} />
+          </button>
+        )}
       </div>
 
       {card.rows.map((row) => (
@@ -629,17 +667,20 @@ function TableCardView({
           buildingFor={buildingFor}
           tables={tables}
           relationships={relationships}
+          readOnly={readOnly}
         />
       ))}
 
-      <button
-        type="button"
-        className="sf-schema-add-column"
-        style={{ height: ROW_H }}
-        onClick={() => dispatch({ type: "ADD_COLUMN", tableId: card.tableId, name: "New column" })}
-      >
-        <PlusOutlined style={{ fontSize: 11 }} /> Add column
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          className="sf-schema-add-column"
+          style={{ height: ROW_H }}
+          onClick={() => dispatch({ type: "ADD_COLUMN", tableId: card.tableId, name: "New column" })}
+        >
+          <PlusOutlined style={{ fontSize: 11 }} /> Add column
+        </button>
+      )}
     </div>
   );
 }
@@ -654,6 +695,7 @@ function ColumnRowView({
   buildingFor,
   tables,
   relationships,
+  readOnly,
 }: {
   tableId: string;
   column: SchemaColumn;
@@ -664,6 +706,7 @@ function ColumnRowView({
   buildingFor: BuildTarget | undefined;
   tables: SchemaDoc["tables"];
   relationships: SchemaDoc["relationships"];
+  readOnly: boolean;
 }) {
   const [nameDraft, setNameDraft] = useState(column.name);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -710,54 +753,60 @@ function ColumnRowView({
         data-connector-table={tableId}
         title="Drag to another column to connect"
       />
-      <Dropdown
-        trigger={["click"]}
-        menu={{
-          items: [
-            {
-              key: "primaryKey",
-              label: "Primary key",
-              icon: column.primaryKey ? <CheckOutlined /> : undefined,
+      {readOnly ? (
+        <span className="sf-schema-row-flags-btn" title="Primary key" aria-label={`Flags for ${column.name}`}>
+          <KeyOutlined className={column.primaryKey ? "sf-schema-row-key is-set" : "sf-schema-row-key"} />
+        </span>
+      ) : (
+        <Dropdown
+          trigger={["click"]}
+          menu={{
+            items: [
+              {
+                key: "primaryKey",
+                label: "Primary key",
+                icon: column.primaryKey ? <CheckOutlined /> : undefined,
+              },
+              {
+                key: "required",
+                label: "Required",
+                icon: column.required ? <CheckOutlined /> : undefined,
+              },
+              {
+                key: "unique",
+                label: "Unique",
+                icon: column.unique ? <CheckOutlined /> : undefined,
+              },
+            ],
+            // Each click toggles just that one flag — a checkable menu, not a
+            // radio group, since a column can be any combination of the three.
+            onClick: ({ key, domEvent }) => {
+              domEvent.stopPropagation();
+              if (key === "primaryKey") {
+                dispatch({ type: "SET_COLUMN_FLAGS", tableId, columnId: column.id, primaryKey: !column.primaryKey });
+              } else if (key === "required") {
+                dispatch({ type: "SET_COLUMN_FLAGS", tableId, columnId: column.id, required: !column.required });
+              } else if (key === "unique") {
+                dispatch({ type: "SET_COLUMN_FLAGS", tableId, columnId: column.id, unique: !column.unique });
+              }
             },
-            {
-              key: "required",
-              label: "Required",
-              icon: column.required ? <CheckOutlined /> : undefined,
-            },
-            {
-              key: "unique",
-              label: "Unique",
-              icon: column.unique ? <CheckOutlined /> : undefined,
-            },
-          ],
-          // Each click toggles just that one flag — a checkable menu, not a
-          // radio group, since a column can be any combination of the three.
-          onClick: ({ key, domEvent }) => {
-            domEvent.stopPropagation();
-            if (key === "primaryKey") {
-              dispatch({ type: "SET_COLUMN_FLAGS", tableId, columnId: column.id, primaryKey: !column.primaryKey });
-            } else if (key === "required") {
-              dispatch({ type: "SET_COLUMN_FLAGS", tableId, columnId: column.id, required: !column.required });
-            } else if (key === "unique") {
-              dispatch({ type: "SET_COLUMN_FLAGS", tableId, columnId: column.id, unique: !column.unique });
-            }
-          },
-        }}
-      >
-        <button
-          type="button"
-          className="sf-schema-row-flags-btn"
-          data-no-drag
-          title="Primary key / required / unique"
-          aria-label={`Flags for ${column.name}`}
+          }}
         >
-          <KeyOutlined
-            className={column.primaryKey ? "sf-schema-row-key is-set" : "sf-schema-row-key"}
-          />
-        </button>
-      </Dropdown>
+          <button
+            type="button"
+            className="sf-schema-row-flags-btn"
+            data-no-drag
+            title="Primary key / required / unique"
+            aria-label={`Flags for ${column.name}`}
+          >
+            <KeyOutlined
+              className={column.primaryKey ? "sf-schema-row-key is-set" : "sf-schema-row-key"}
+            />
+          </button>
+        </Dropdown>
+      )}
 
-      {isEditing ? (
+      {isEditing && !readOnly ? (
         <Input
           size="small"
           autoFocus
@@ -773,12 +822,16 @@ function ColumnRowView({
           className="sf-schema-row-name-input"
         />
       ) : (
-        <span className="sf-schema-row-name" onDoubleClick={onStartEdit} title="Double-click to rename">
+        <span
+          className="sf-schema-row-name"
+          onDoubleClick={readOnly ? undefined : onStartEdit}
+          title={readOnly ? undefined : "Double-click to rename"}
+        >
           {column.name}
         </span>
       )}
 
-      {showOptionsEditor && (
+      {showOptionsEditor && !readOnly && (
         <Popover
           trigger="click"
           open={optionsOpen}
@@ -811,7 +864,7 @@ function ColumnRowView({
         </Popover>
       )}
 
-      {showSourceEditor && (
+      {showSourceEditor && !readOnly && (
         <Popover
           trigger="click"
           open={sourceOpen}
@@ -840,7 +893,7 @@ function ColumnRowView({
         </Popover>
       )}
 
-      {showRelationEditor && (
+      {showRelationEditor && !readOnly && (
         <Popover
           trigger="click"
           open={relationOpen}
@@ -875,41 +928,49 @@ function ColumnRowView({
         </Tooltip>
       )}
 
-      <Dropdown
-        menu={{
-          items: typeMenuItems,
-          onClick: ({ key }) =>
-            dispatch({ type: "SET_COLUMN_TYPE", tableId, columnId: column.id, columnType: key as ColumnType }),
-        }}
-        trigger={["click"]}
-      >
+      {readOnly ? (
+        <span className="sf-schema-row-type" style={{ color: typeAccentColor(column) }}>
+          {activeTargetName ?? columnTypeLabel(column.type)}
+        </span>
+      ) : (
+        <Dropdown
+          menu={{
+            items: typeMenuItems,
+            onClick: ({ key }) =>
+              dispatch({ type: "SET_COLUMN_TYPE", tableId, columnId: column.id, columnType: key as ColumnType }),
+          }}
+          trigger={["click"]}
+        >
+          <button
+            type="button"
+            className="sf-schema-row-type"
+            data-no-drag
+            style={{ color: typeAccentColor(column) }}
+            // Once a target is set, its own name for this type IS the badge —
+            // not a tooltip on top of the neutral label. Ruthnie's correction,
+            // 2026-09-03: "it shouldn't just have a tooltip... it should
+            // change to linked record." The neutral label still surfaces in
+            // the type picker's menu (where the mapping itself is being
+            // shown), just not as the persistent on-canvas text once a
+            // target is chosen.
+            title={activeTargetName && activeTargetName !== columnTypeLabel(column.type) ? columnTypeLabel(column.type) : undefined}
+          >
+            {activeTargetName ?? columnTypeLabel(column.type)}
+          </button>
+        </Dropdown>
+      )}
+
+      {!readOnly && (
         <button
           type="button"
-          className="sf-schema-row-type"
+          className="sf-schema-row-delete"
           data-no-drag
-          style={{ color: typeAccentColor(column) }}
-          // Once a target is set, its own name for this type IS the badge —
-          // not a tooltip on top of the neutral label. Ruthnie's correction,
-          // 2026-09-03: "it shouldn't just have a tooltip... it should
-          // change to linked record." The neutral label still surfaces in
-          // the type picker's menu (where the mapping itself is being
-          // shown), just not as the persistent on-canvas text once a
-          // target is chosen.
-          title={activeTargetName && activeTargetName !== columnTypeLabel(column.type) ? columnTypeLabel(column.type) : undefined}
+          onClick={() => dispatch({ type: "DELETE_COLUMN", tableId, columnId: column.id })}
+          aria-label={`Delete ${column.name}`}
         >
-          {activeTargetName ?? columnTypeLabel(column.type)}
+          <DeleteOutlined style={{ fontSize: 10 }} />
         </button>
-      </Dropdown>
-
-      <button
-        type="button"
-        className="sf-schema-row-delete"
-        data-no-drag
-        onClick={() => dispatch({ type: "DELETE_COLUMN", tableId, columnId: column.id })}
-        aria-label={`Delete ${column.name}`}
-      >
-        <DeleteOutlined style={{ fontSize: 10 }} />
-      </button>
+      )}
     </div>
   );
 }
