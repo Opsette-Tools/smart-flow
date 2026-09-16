@@ -3,10 +3,11 @@ import { message } from "antd";
 import { App } from "./App";
 import { connectBridge } from "./components/opsette-bridge";
 import { hydrateFromBridge } from "./db/flowsRepo";
+import { hydrateFromDiscoveryBridge } from "./db/discoverySessionsRepo";
 import { migrateLegacyIfNeeded } from "./db/migrateLegacy";
-import type { BridgedFlowValue } from "./db/types";
+import type { BridgedValue } from "./db/types";
 import { setActiveFlowId } from "./lib/activeFlow";
-import { setBridgeInstance } from "./lib/bridgeInstance";
+import { resetParentKnown, setBridgeInstance } from "./lib/bridgeInstance";
 import "reactflow/dist/style.css";
 import "./styles/tokens.css";
 import "./components/smartflow/smartflow.css";
@@ -64,10 +65,15 @@ if (isPreviewHost || isInIframe) {
 // Bridge handshake gate. In standalone (window.parent === window) this
 // resolves to null in <1ms; inside an iframe it awaits the parent's `init`
 // for up to 1s — render is never blocked past that. When bridge-mode boots,
-// hydrate IDB from init.items BEFORE rendering so flowsRepo returns the
-// right data on first render. Local-only rows are left untouched either way
-// (see hydrateFromBridge / SMARTFLOW_STORAGE_PLAN.md §8.2).
-connectBridge<BridgedFlowValue>().then(async (bridge) => {
+// hydrate IDB from init.items BEFORE rendering so flowsRepo/
+// discoverySessionsRepo return the right data on first render. Local-only
+// rows are left untouched either way (see hydrateFromBridge /
+// SMARTFLOW_STORAGE_PLAN.md §8.2). Both hydrates read the same shared
+// init.items array and split it by `kind` (see BridgedValue in db/types.ts);
+// resetParentKnown is called ONCE with the combined ids afterward, since it
+// clears the set before refilling it and would otherwise have each hydrate
+// clobber the other's ids.
+connectBridge<BridgedValue>().then(async (bridge) => {
   setBridgeInstance(bridge);
   if (bridge) {
     // Debounced toast: multiple timeouts in a 1s window collapse to a single
@@ -80,9 +86,13 @@ connectBridge<BridgedFlowValue>().then(async (bridge) => {
       message.error("Couldn't save — try again");
     });
     try {
-      await hydrateFromBridge(bridge.init.items);
+      const [flowIds, discoveryIds] = await Promise.all([
+        hydrateFromBridge(bridge.init.items),
+        hydrateFromDiscoveryBridge(bridge.init.items),
+      ]);
+      resetParentKnown([...flowIds, ...discoveryIds]);
     } catch (err) {
-      console.error("[smart-flow] hydrateFromBridge failed:", err);
+      console.error("[smart-flow] bridge hydrate failed:", err);
     }
   }
 

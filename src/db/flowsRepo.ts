@@ -18,9 +18,8 @@ import {
   isBridgeMode,
   isParentKnown,
   markParentKnown,
-  resetParentKnown,
 } from "@/lib/bridgeInstance";
-import { DB_NAME, DB_VERSION, FLOWS_STORE, type BridgedFlowValue, type Flow } from "./types";
+import { DB_NAME, DB_VERSION, FLOWS_STORE, type BridgedFlowValue, type BridgedValue, type Flow } from "./types";
 
 // Fire-and-forget bridge.save for one row. Local IDB is already the source of
 // truth for the caller by the time this runs, so a bridge failure (timeout,
@@ -137,15 +136,30 @@ export const flowsRepo = {
  * IndexedDB rows are NOT auto-migrated: this only writes the rows the parent
  * sent (`init.items`), and never clears or touches anything already in IDB
  * that the parent didn't mention — a local-only flow stays exactly as it was.
+ *
+ * `items` is the same shared bridge.init.items array discoverySessionsRepo's
+ * hydrateFromDiscoveryBridge also reads — one bridge, one data_id space (see
+ * BridgedValue in db/types.ts). A row counts as a flow when it's NOT tagged
+ * `kind: "discovery"`: every flow ever bridged before discovery sessions
+ * existed has no `kind` field at all, so "absence of the discovery tag" is
+ * the only backward-compatible way to identify a flow row.
+ *
+ * Returns the ids this hydrate consumed so main.tsx can combine them with
+ * discovery's and call resetParentKnown ONCE with the full set — calling it
+ * from both hydrate functions independently would have each clobber the
+ * other's ids (resetParentKnown clears the set before refilling it).
  */
-export async function hydrateFromBridge(items: Array<{ data_id: string; value: BridgedFlowValue }>): Promise<void> {
-  if (items.length === 0) return;
+export async function hydrateFromBridge(items: Array<{ data_id: string; value: BridgedValue }>): Promise<string[]> {
+  const flowItems = items.filter(
+    (item): item is { data_id: string; value: BridgedFlowValue } =>
+      !!item.value && typeof item.value === "object" && !("kind" in item.value),
+  );
+  if (flowItems.length === 0) return [];
   const db = await getDb();
   const tx = db.transaction(FLOWS_STORE, "readwrite");
   const now = Date.now();
   const ids: string[] = [];
-  for (const { data_id, value } of items) {
-    if (!value || typeof value !== "object") continue;
+  for (const { data_id, value } of flowItems) {
     const existing = (await tx.store.get(data_id)) as Flow | undefined;
     const flow: Flow = {
       id: data_id,
@@ -159,5 +173,5 @@ export async function hydrateFromBridge(items: Array<{ data_id: string; value: B
     ids.push(data_id);
   }
   await tx.done;
-  resetParentKnown(ids);
+  return ids;
 }

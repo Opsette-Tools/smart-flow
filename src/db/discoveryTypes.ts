@@ -1,9 +1,8 @@
 /**
  * DiscoverySession — one live-meeting capture sheet. Separate entity from
- * Flow: this is raw discovery input, upstream of any saved diagram. Local
- * IndexedDB only, no Opsette bridge sync — nothing in the capture-sheet spec
- * calls for cross-tool sync, and adding it later is additive to this shape,
- * not a rework.
+ * Flow: this is raw discovery input, upstream of any saved diagram. Same flat
+ * { id, name, createdAt, updatedAt, content } shape as Flow, and bridged to
+ * Opsette the same way — see BridgedDiscoveryValue in types.ts.
  */
 
 import type { DiscoveryDoc } from "@/components/discovery/types";

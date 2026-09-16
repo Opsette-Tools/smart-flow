@@ -1,22 +1,26 @@
 import type { Bridge } from "@/components/opsette-bridge";
-import type { BridgedFlowValue } from "@/db/types";
+import type { BridgedValue } from "@/db/types";
 
-// Module-level singleton so non-React code (flowsRepo) can check bridge mode
-// without threading React context through every call site. Set once during
-// the main.tsx bootstrap.
+// Module-level singleton so non-React code (flowsRepo, discoverySessionsRepo)
+// can check bridge mode without threading React context through every call
+// site. Set once during the main.tsx bootstrap. One instance serves both
+// flows and discovery sessions — see BridgedValue in db/types.ts.
 
-let instance: Bridge<BridgedFlowValue> | null = null;
+let instance: Bridge<BridgedValue> | null = null;
 
 // Ids the parent has acknowledged (either in init.items or via a successful
-// save ack). Local-only flows are never auto-uploaded (SMARTFLOW_STORAGE_PLAN
-// §8.2), so a delete only reaches the parent when it already knows the id.
+// save ack). Flat across flows and discovery sessions — both mint ids via
+// uuid(), so a shared set can't collide, and a single "does the parent know
+// this id" question doesn't care which namespace it came from. Local-only
+// rows are never auto-uploaded (SMARTFLOW_STORAGE_PLAN §8.2), so a delete
+// only reaches the parent when it already knows the id.
 const parentKnownIds = new Set<string>();
 
-export function setBridgeInstance(b: Bridge<BridgedFlowValue> | null): void {
+export function setBridgeInstance(b: Bridge<BridgedValue> | null): void {
   instance = b;
 }
 
-export function getBridgeInstance(): Bridge<BridgedFlowValue> | null {
+export function getBridgeInstance(): Bridge<BridgedValue> | null {
   return instance;
 }
 
