@@ -10,8 +10,19 @@ import { uuid } from "@/lib/uuid";
 import { diagramInfo, type DiagramType } from "@/components/smartflow/diagramTypes";
 import { emptyDoc } from "@/components/smartflow/store";
 import { emptySchemaDoc } from "@/components/smartflow/schema/types";
+import { emptyMondayDoc } from "@/components/smartflow/monday/types";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
 import type { SchemaDoc } from "@/components/smartflow/schema/types";
+import type { MondayDoc } from "@/components/smartflow/monday/types";
+
+/** The starting content for a brand-new flow of `type`. Three doc shapes,
+ *  one per branch of Flow.content's discriminated union — a lookup rather
+ *  than a chain of ternaries so adding a fourth shape is one line. */
+function emptyContentFor(type: DiagramType): SmartFlowDoc | SchemaDoc | MondayDoc {
+  if (type === "schema") return emptySchemaDoc;
+  if (type === "monday") return emptyMondayDoc;
+  return emptyDoc;
+}
 import {
   forgetParentKnown,
   getBridgeInstance,
@@ -69,7 +80,7 @@ export const flowsRepo = {
   async create(opts: {
     type: DiagramType;
     name?: string;
-    content?: SmartFlowDoc | SchemaDoc;
+    content?: SmartFlowDoc | SchemaDoc | MondayDoc;
   }): Promise<Flow> {
     const db = await getDb();
     const now = Date.now();
@@ -79,14 +90,14 @@ export const flowsRepo = {
       name: opts.name?.trim() || `Untitled ${diagramInfo(opts.type).name}`,
       createdAt: now,
       updatedAt: now,
-      content: opts.content ?? (opts.type === "schema" ? emptySchemaDoc : emptyDoc),
+      content: opts.content ?? emptyContentFor(opts.type),
     };
     await db.put(FLOWS_STORE, flow);
     persistToBridge(flow);
     return flow;
   },
 
-  async updateContent(id: string, content: SmartFlowDoc | SchemaDoc): Promise<void> {
+  async updateContent(id: string, content: SmartFlowDoc | SchemaDoc | MondayDoc): Promise<void> {
     const db = await getDb();
     const existing = (await db.get(FLOWS_STORE, id)) as Flow | undefined;
     if (!existing) return;

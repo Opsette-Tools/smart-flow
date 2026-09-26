@@ -7,6 +7,7 @@
 
 import type { DiagramType } from "@/components/smartflow/diagramTypes";
 import type { SchemaDoc } from "@/components/smartflow/schema/types";
+import type { MondayDoc } from "@/components/smartflow/monday/types";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
 import type { DiscoveryDoc } from "@/components/discovery/types";
 import type { DiscoverySession } from "./discoveryTypes";
@@ -19,9 +20,11 @@ export interface Flow {
   updatedAt: number;
   /** The five process-diagram types share SmartFlowDoc (lanes empty for the
    *  four outline types). "schema" carries a structurally unrelated SchemaDoc
-   *  instead — a real discriminated union on `type`, not a lossy stand-in for
-   *  one shape by the other. See docs/SCHEMA-DESIGNER-PLAN.md §2. */
-  content: SmartFlowDoc | SchemaDoc;
+   *  instead, and "monday" a MondayDoc — a real discriminated union on
+   *  `type`, not a lossy stand-in for one shape by the others. See
+   *  docs/SCHEMA-DESIGNER-PLAN.md §2 and
+   *  docs/MONDAY-BOARD-DESIGNER-PLAN.md §3.1. */
+  content: SmartFlowDoc | SchemaDoc | MondayDoc;
 }
 
 export const DB_NAME = "smart-flow";

@@ -12,6 +12,7 @@
 
 import type { DiagramType } from "@/components/smartflow/diagramTypes";
 import type { SchemaDoc } from "@/components/smartflow/schema/types";
+import type { MondayDoc } from "@/components/smartflow/monday/types";
 import type { SmartFlowDoc } from "@/components/smartflow/types";
 import type { Flow } from "@/db/types";
 
@@ -24,7 +25,7 @@ interface SmartFlowExportFile {
   flow: {
     type: DiagramType;
     name: string;
-    content: SmartFlowDoc | SchemaDoc;
+    content: SmartFlowDoc | SchemaDoc | MondayDoc;
   };
 }
 
@@ -46,7 +47,7 @@ export function flowExportFileName(name: string): string {
 export interface ParsedFlowImport {
   type: DiagramType;
   name: string;
-  content: SmartFlowDoc | SchemaDoc;
+  content: SmartFlowDoc | SchemaDoc | MondayDoc;
 }
 
 const VALID_OUTLINE_TYPES: DiagramType[] = ["flowchart", "swimlane", "decision-tree", "org-tree", "timeline"];
@@ -71,11 +72,21 @@ function isLikelySchemaDoc(v: unknown): v is Record<string, unknown> {
   return Array.isArray(d.tables) && Array.isArray(d.relationships);
 }
 
+/** True for a MondayDoc — checked by the `boards` array only `monday`-type
+ *  flows ever write. A SchemaDoc has `tables`/`relationships` and a
+ *  SmartFlowDoc has `lanes`/`items`, so the three shapes never collide. */
+function isLikelyMondayDoc(v: unknown): v is Record<string, unknown> {
+  if (typeof v !== "object" || v === null) return false;
+  const d = v as Record<string, unknown>;
+  return Array.isArray(d.boards);
+}
+
 /** Parse an imported file's text. Accepts either shape:
  *   1. A real Export from this app's own "Export" action:
  *      { type: "opsette-smartflow-flow", v: 1, flow: { type, name, content } }
- *      `content` is a SmartFlowDoc for the five process-diagram types, or a
- *      SchemaDoc for "schema" — checked by shape, not trusted from `type`
+ *      `content` is a SmartFlowDoc for the five process-diagram types, a
+ *      SchemaDoc for "schema", or a MondayDoc for "monday" — checked by
+ *      shape, not trusted from `type`
  *      alone, so a hand-edited or mismatched file fails cleanly instead of
  *      importing the wrong doc shape into the wrong reducer.
  *   2. The raw legacy swimlane doc, wrapped or bare:
@@ -102,6 +113,10 @@ export function parseFlowImport(text: string): ParsedFlowImport | null {
     if (f.type === "schema") {
       if (!isLikelySchemaDoc(f.content)) return null;
       return { type: "schema", name: f.name, content: f.content as unknown as SchemaDoc };
+    }
+    if (f.type === "monday") {
+      if (!isLikelyMondayDoc(f.content)) return null;
+      return { type: "monday", name: f.name, content: f.content as unknown as MondayDoc };
     }
     if (typeof f.type !== "string" || !VALID_OUTLINE_TYPES.includes(f.type as DiagramType)) return null;
     if (!isLikelySmartFlowDoc(f.content)) return null;

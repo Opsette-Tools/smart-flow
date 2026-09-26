@@ -28,3 +28,6 @@ dev-dist
 
 # Client discovery transcripts/exports — not for the public repo
 meeting-summaries/
+
+# Build output capture (tee-build hook) — always the current build, never committed
+build.log

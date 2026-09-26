@@ -27,7 +27,10 @@ import { StepInspector } from "./build/StepInspector";
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-type OutlineType = Exclude<DiagramType, "swimlane" | "schema">;
+// The outline builder drives a SmartFlowDoc. "swimlane" has its own builder,
+// and "schema"/"monday" carry structurally unrelated docs with their own
+// pages — none of the three can be typed into as an indented outline.
+type OutlineType = Exclude<DiagramType, "swimlane" | "schema" | "monday">;
 
 interface Props {
   type: OutlineType;

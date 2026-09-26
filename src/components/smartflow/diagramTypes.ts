@@ -13,7 +13,8 @@ export type DiagramType =
   | "decision-tree"
   | "org-tree"
   | "timeline"
-  | "schema";
+  | "schema"
+  | "monday";
 
 export interface DiagramTypeInfo {
   type: DiagramType;
@@ -69,6 +70,13 @@ export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
     blurb: "Tables and fields, with the relationships between them.",
     chooserAnswer: "I want to design a database, or the fields for a board or spreadsheet",
     inputHint: "Add a table, then add columns to it. Drag between columns to connect them.",
+  },
+  {
+    type: "monday",
+    name: "Monday Board Designer",
+    blurb: "Monday boards, their groups, and the columns on items and subitems.",
+    chooserAnswer: "I want to plan a Monday.com workspace before building it",
+    inputHint: "Add a board, then its groups and columns. Connect columns link boards together.",
   },
 ];
 

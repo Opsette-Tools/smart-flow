@@ -2497,3 +2497,298 @@ html.dark .sf-discovery-export-steps-list > .ant-checkbox-wrapper:first-child {
     max-height: none;
   }
 }
+
+/* ── Monday board designer ──────────────────────────────────────────
+   Reuses the schema canvas's frame/stage/lines/toolbar classes (the
+   pan-zoom shell is the same engine). What is Monday-specific is the
+   CARD: a group chip row in the header, and up to two column bands with
+   the subitem one visually distinct. See
+   docs/MONDAY-BOARD-DESIGNER-PLAN.md §6. */
+
+.sf-monday-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-md);
+}
+
+/* The card itself reuses .sf-schema-card wholesale — same background,
+   border, radius, shadow and dark-mode cascade. Only the Monday-specific
+   parts are defined here. (An earlier pass duplicated the card rules and
+   added `display: flex`, which fought the absolute row heights the model
+   computes and made the card read squished and shadowless.) */
+/* Groups are structure, but they are NOT columns — a chip row, never rows,
+   so the card can never read as though a group were a field. */
+.sf-monday-groups {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--sf-border, #eee);
+  background: var(--sf-band-bg, #fbfbfb);
+}
+html.dark .sf-monday-groups {
+  --sf-band-bg: #161616;
+  --sf-border: #262626;
+}
+/* The guidance affordance on a band heading — the subitem band's §5.5 note
+   lives here rather than as a permanent paragraph on the card. Muted, so it
+   reads as available rather than as a warning. */
+.sf-monday-band-info {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sf-muted, #b0b0b0);
+  cursor: help;
+  font-size: 11px;
+}
+.sf-monday-band-info:hover {
+  color: var(--ops-green);
+}
+html.dark .sf-monday-band-info {
+  --sf-muted: #6f6f6f;
+}
+
+/* A real Monday group is a COLOURED BAR owning a section of rows, not a
+   tag. The chip keeps that read: a thick colour bar on the left, the name in
+   normal text. Stacked vertically and ordered, because a board's groups are
+   a flat ORDERED list (Monday has no nested groups — the only nesting is
+   item -> subitem, exactly one level). Ordering is the hierarchy here: for a
+   pipeline board the group order IS the stage order. */
+.sf-monday-group-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0 2px 0;
+  font-size: 11.5px;
+  color: var(--sf-fg, #333);
+  cursor: default;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html.dark .sf-monday-group-chip {
+  --sf-fg: #ddd;
+}
+.sf-monday-group-bar {
+  width: 4px;
+  height: 13px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.sf-monday-group-order {
+  font-size: 10px;
+  color: var(--sf-muted, #aaa);
+  flex-shrink: 0;
+  min-width: 12px;
+}
+html.dark .sf-monday-group-order {
+  --sf-muted: #777;
+}
+/* Matches .sf-monday-group-add exactly — same width (full, via the band's
+   align-items: stretch) and same height, so swapping the button for the
+   input on "+ Group" doesn't make the row jump. */
+.sf-monday-group-input {
+  width: 100%;
+  height: 22px;
+  font-size: 11px;
+}
+/* Board rename, in place in the coloured header — sized to sit on the
+   header band without the card growing. */
+.sf-monday-name-input {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  font-size: 13px;
+  font-weight: 600;
+}
+/* The empty-state affordance for groups. Quiet by default — it is a way in,
+   not a call to action — but always present, so a Group never has to be
+   discovered through the kebab. */
+.sf-monday-group-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px dashed var(--sf-border, #d9d9d9);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sf-muted, #999);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sf-monday-group-add:hover {
+  color: var(--ops-green);
+  border-color: var(--ops-green);
+}
+html.dark .sf-monday-group-add {
+  --sf-border: #333;
+  --sf-muted: #8a8a8a;
+}
+
+/* Same role for the subitem set: one quiet line saying the board CAN have
+   subitem columns, so the separate-schema idea is discoverable. */
+.sf-monday-add-subitems {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  border-top: 1px dashed var(--sf-border, #e2e2e2);
+  background: transparent;
+  color: var(--sf-muted, #999);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 8px;
+}
+.sf-monday-add-subitems:hover {
+  color: var(--ops-green);
+  background: rgba(47, 79, 70, 0.05);
+}
+html.dark .sf-monday-add-subitems {
+  --sf-border: #2a2a2a;
+  --sf-muted: #8a8a8a;
+}
+
+/* The band divider. Small caps, letterspaced — it reads as a section label,
+   not as another row of data. */
+.sf-monday-band-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--sf-muted, #9a9a9a);
+  border-bottom: 1px solid var(--sf-border, #eee);
+  background: var(--sf-band-bg, #fbfbfb);
+}
+html.dark .sf-monday-band-label {
+  --sf-border: #262626;
+  --sf-muted: #7a7a7a;
+  --sf-band-bg: #161616;
+}
+
+/* A board's subitem column set is a SEPARATE schema — the single most
+   misunderstood thing about Monday. Tinted and inset so the card says that
+   at a glance rather than in a tooltip. */
+.sf-monday-subitem-band {
+  margin: 8px 6px 0;
+  border: 1px solid var(--sf-sub-border, #e4e0d8);
+  border-radius: 6px;
+  background: var(--sf-sub-bg, #faf7f2);
+  overflow: hidden;
+}
+html.dark .sf-monday-subitem-band {
+  --sf-sub-border: #33302a;
+  --sf-sub-bg: #1c1a16;
+}
+.sf-monday-subitem-band .sf-monday-band-label {
+  --sf-band-bg: transparent;
+  background: transparent;
+}
+
+.sf-monday-row {
+  position: relative;
+}
+/* A Mirror shown under the Connect it rides. Indented and faintly tinted, so
+   the dependency is legible at a glance and stays legible however many
+   columns sat between the two in the stored order — orderedColumns() moves
+   the Mirror up to its Connect rather than only indenting it in place. */
+.sf-monday-row.is-nested {
+  padding-left: 4px;
+  background: var(--sf-nest-bg, rgba(90, 122, 158, 0.05));
+}
+html.dark .sf-monday-row.is-nested {
+  --sf-nest-bg: rgba(125, 151, 181, 0.09);
+}
+.sf-monday-row-nest {
+  color: var(--sf-muted, #9db1c7);
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+html.dark .sf-monday-row-nest {
+  --sf-muted: #6d8299;
+}
+/* The type accent as a left rule rather than a dot: a Monday row's kind
+   (plain / connect / mirror) matters more than any single value, so it gets
+   a persistent edge instead of a hoverable target. */
+.sf-monday-row-accent {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sf-monday-type-select {
+  min-width: 92px;
+  font-size: 11.5px;
+}
+.sf-monday-type-select .ant-select-selector {
+  padding-inline: 4px !important;
+}
+.sf-monday-connect-select {
+  min-width: 110px;
+}
+/* Connect target, in the row's select and in its dropdown. The plug glyph
+   carries "road between two boards" better than the text arrow this used to
+   use, and it matches the icon on the Mirror that rides it. */
+.sf-monday-connect-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sf-monday-connect-option .anticon {
+  color: #c0392b;
+  font-size: 11px;
+}
+
+.sf-monday-mirror-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 130px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--sf-mirror-fg, #5a7a9e);
+  background: var(--sf-mirror-bg, #eef3f8);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html.dark .sf-monday-mirror-badge {
+  --sf-mirror-fg: #9fbadb;
+  --sf-mirror-bg: #1d2530;
+}
+
+.sf-monday-addcol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sf-monday-addcol-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--sf-muted, #8c8c8c);
+}
+html.dark .sf-monday-addcol-note {
+  --sf-muted: #8a8a8a;
+}
+
+/* Mobile: the board card goes full width and the group chips wrap. The
+   subitem band stays visually distinct at every size — that distinction is
+   the point of the card, so it is never the thing that gets dropped. */
+@media (max-width: 767px) {
+  .sf-monday-group-chip {
+    max-width: 110px;
+  }
+}

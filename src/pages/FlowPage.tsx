@@ -27,6 +27,16 @@ import { isBridgeMode } from "@/lib/bridgeInstance";
 import { useFlows } from "@/layout/FlowsContext";
 import { flowExportFileName, serializeFlowExport, triggerDownload } from "@/lib/flowExport";
 import { SchemaFlowPage } from "./SchemaFlowPage";
+import { MondayFlowPage } from "./MondayFlowPage";
+
+/** The diagram types whose `content` is NOT a SmartFlowDoc. Each owns its own
+ *  page and its own reducer, so this component's reducer, autosave and view
+ *  tabs all skip them. One predicate rather than a chain of `!== "schema"`
+ *  checks: when a third such type is added, the branches that must learn
+ *  about it are the ones that call this. */
+function hasOwnDocShape(type: DiagramType): boolean {
+  return type === "schema" || type === "monday";
+}
 
 const { Text } = Typography;
 type ViewMode = "build" | "diagram" | "charts" | "map";
@@ -84,14 +94,15 @@ export default function FlowPage() {
       }
       setFlow(f);
       loadedIdRef.current = f.id;
-      // A schema flow's content is a SchemaDoc, not a SmartFlowDoc — it never
-      // reaches this reducer. SchemaFlowPage (rendered below, before any of
-      // this component's own JSX) owns its own reducer and its own load. The
+      // A schema flow's content is a SchemaDoc and a monday flow's is a
+      // MondayDoc, not a SmartFlowDoc — neither ever reaches this reducer.
+      // SchemaFlowPage / MondayFlowPage (rendered below, before any of this
+      // component's own JSX) own their own reducer and their own load. The
       // cast is safe: the runtime check just confirmed `f.type`, which is
-      // what SchemaFlowPage's early return (further down this component)
-      // also keys on — TS can't correlate the two independently-typed fields
-      // through this closure on its own.
-      if (f.type !== "schema") dispatch({ type: "REPLACE_DOC", doc: f.content as SmartFlowDoc });
+      // what those early returns (further down this component) also key on —
+      // TS can't correlate the two independently-typed fields through this
+      // closure on its own.
+      if (!hasOwnDocShape(f.type)) dispatch({ type: "REPLACE_DOC", doc: f.content as SmartFlowDoc });
       setActiveFlowId(f.id);
     });
     return () => {
@@ -104,13 +115,14 @@ export default function FlowPage() {
   // loaded so the reducer's initial emptyDoc can never clobber a real saved
   // board mid-navigation. Standard debounce: a superseded timer is cleared,
   // not fired early — the flush-on-unmount effect below covers the case
-  // where the page leaves before the timer would have fired. Schema flows
-  // never reach this effect (see the early return below, before this
-  // component's own JSX) — SchemaFlowPage owns its own autosave against its
-  // own reducer, so this effect writing SmartFlowDoc's still-empty `doc` over
-  // real schema content is not a live risk, but the guard stays anyway.
+  // where the page leaves before the timer would have fired. Schema and
+  // monday flows never reach this effect (see the early returns below,
+  // before this component's own JSX) — those pages own their own autosave
+  // against their own reducers, so this effect writing SmartFlowDoc's
+  // still-empty `doc` over real schema/board content is not a live risk, but
+  // the guard stays anyway.
   useEffect(() => {
-    if (!flow || flow.type === "schema" || loadedIdRef.current !== flow.id) return;
+    if (!flow || hasOwnDocShape(flow.type) || loadedIdRef.current !== flow.id) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     const debounceMs = isBridgeMode() ? AUTOSAVE_DEBOUNCE_BRIDGED_MS : AUTOSAVE_DEBOUNCE_STANDALONE_MS;
     saveTimer.current = window.setTimeout(() => {
@@ -215,6 +227,12 @@ export default function FlowPage() {
     return <SchemaFlowPage id={flow.id} flow={flow} />;
   }
 
+  if (flow.type === "monday") {
+    // Same split, for the same reason — a MondayDoc shares no fields with a
+    // SmartFlowDoc, so it gets its own page rather than a branch here.
+    return <MondayFlowPage id={flow.id} flow={flow} />;
+  }
+
   return (
     <>
       <div className="sf-topbar">
@@ -269,7 +287,11 @@ export default function FlowPage() {
         flow.type === "swimlane" ? (
           <BuildMode doc={doc} dispatch={dispatch} />
         ) : (
-          <OutlineBuilder type={flow.type as Exclude<DiagramType, "swimlane" | "schema">} doc={doc} dispatch={dispatch} />
+          <OutlineBuilder
+            type={flow.type as Exclude<DiagramType, "swimlane" | "schema" | "monday">}
+            doc={doc}
+            dispatch={dispatch}
+          />
         )
       ) : viewMode === "map" ? (
         <SchemaMapView doc={doc} dispatch={dispatch} />

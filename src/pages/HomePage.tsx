@@ -5,6 +5,7 @@ import {
   ClusterOutlined,
   FieldTimeOutlined,
   PartitionOutlined,
+  ProjectOutlined,
   TableOutlined,
 } from "@ant-design/icons";
 import { DIAGRAM_TYPES, diagramInfo, type DiagramType } from "@/components/smartflow/diagramTypes";
@@ -20,6 +21,7 @@ const TYPE_ICONS: Record<DiagramType, React.ReactNode> = {
   "org-tree": <ApartmentOutlined />,
   timeline: <FieldTimeOutlined />,
   schema: <TableOutlined />,
+  monday: <ProjectOutlined />,
 };
 
 function formatUpdated(ts: number): string {

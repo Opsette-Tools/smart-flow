@@ -317,7 +317,7 @@ the kind of late, expensive discovery this whole tool exists to prevent.
   canvas stays purely canonical, matching the original design for that one
   case only.
 
-### 4.0.1 Board-vs-table modeling — explicitly out of scope
+### 4.0.1 Board-structure *inference* — explicitly out of scope
 
 Monday's real unit of organization is a board (with its own permissions,
 automations, views), not a table — and deciding "does this deserve its own
@@ -328,6 +328,17 @@ merging thin/low-cardinality `SchemaTable`s into wider boards — **rejected
 by Ruthnie, 2026-09-03**: this is the user's call to make, not something
 the tool should infer or nudge. `SchemaTable` stays a plain one-table/
 one-board unit with no merge-suggestion feature, now or later.
+
+> **Heading corrected 2026-09-26.** This section was headed "Board-vs-table
+> modeling — explicitly out of scope," which is broader than the decision
+> underneath it. What was rejected is an **inference engine that guesses at
+> board structure** — not modeling Monday boards at all. Modeling them
+> properly, in a separate designer with its own doc type, is
+> [MONDAY-BOARD-DESIGNER-PLAN.md](./MONDAY-BOARD-DESIGNER-PLAN.md) (built
+> 2026-09-26). That designer states fixed platform limitations at the point
+> of use; it never evaluates whether a given board is structured correctly,
+> so it does not cross the line drawn here. The old heading risked reading
+> as though it forbade that whole plan.
 
 | Canonical | SQL (DDL) | Airtable field type | Monday column type |
 |---|---|---|---|
